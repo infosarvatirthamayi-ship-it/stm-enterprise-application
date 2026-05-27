@@ -50,7 +50,7 @@ router.get("/offer/index", protect, offerController.getOffers);
 router.post("/offer/show", protect, offerController.getOfferById);
 router.get("/offers/:id", protect, offerController.getOfferById);
 
-// --- Favourite / Favorite Compatibility (Cleaned Duplicates) ---
+// --- Favourite / Favorite Compatibility ---
 router.post("/favourite", protect, favouriteController.favourite);
 router.post("/favorite", protect, favouriteController.favourite);
 router.get("/favourite/index", protect, favouriteController.favouriteGet);
@@ -91,12 +91,17 @@ router.post("/reset-password", userController.resetPassword);
 router.get("/auth/check-auth", protect, (req, res) => {
   res.status(200).json({ success: true, user: req.user });
 });
+
 router.get("/profile", protect, userController.getProfile);
-router.post("/profile", protect, upload.fields([{ name: "profile_picture", maxCount: 1 }]), userController.updateProfile);
-router.put("/update-profile", protect, upload.fields([
-    { name: "profile_picture", maxCount: 1 },
-    { name: "banner_image", maxCount: 1 },
-  ]), userController.updateProfile);
+
+const profileUploadFields = upload.fields([
+  { name: "profile_picture", maxCount: 1 },
+  { name: "banner_image", maxCount: 1 },
+]);
+
+router.post("/profile", protect, profileUploadFields, userController.updateProfile);
+router.put("/profile", protect, profileUploadFields, userController.updateProfile);
+router.put("/update-profile", protect, profileUploadFields, userController.updateProfile);
 
 // --- Temple Booking Flow ---
 router.post("/temple/booking", protect, templeBookingController.createTempleBookingOrder);
@@ -108,7 +113,6 @@ router.get("/membership-card/index", protect, getActiveMemberships);
 router.post("/membership-card/purchase", protect, purchaseMembershipCard);
 router.post("/membership-card/verify-payment", protect, verifyMembershipPayment);
 router.get("/membership-card/my-card", protect, getMyMembershipCard);
-// Add this line in the Public section (No 'protect' middleware)
 router.get("/membership-plans/active", getActiveMemberships);
 
 // --- Legacy Compatibility ---

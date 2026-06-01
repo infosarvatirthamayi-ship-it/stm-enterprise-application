@@ -76,14 +76,15 @@ exports.signupUser = async (req, res) => {
 // --- VERIFY OTP ---
 exports.verifyOtp = async (req, res) => {
   try {
-    const { mobile_number, otp } = req.body;
-    if (!mobile_number || !otp) {
-      return res.status(400).json({ status: "false", success: false, message: "Required fields missing." });
+    const { mobile_number, otp, user_id } = req.body; // Add user_id here
+
+    let user;
+    if (mobile_number) {
+      const cleanMobile = String(mobile_number).replace(/\D/g, "").slice(-10);
+      user = await User.findOne({ mobile_number: cleanMobile, otp });
+    } else if (user_id) {
+      user = await User.findOne({ _id: user_id, otp }); // 🎯 Fallback to MongoDB ID
     }
-
-    const cleanMobile = String(mobile_number).replace(/\D/g, "").slice(-10);
-    const user = await User.findOne({ mobile_number: cleanMobile, otp });
-
     if (!user) return res.status(400).json({ status: "false", success: false, message: "Invalid code." });
     if (new Date() > user.otp_expires) return res.status(400).json({ status: "false", success: false, message: "Code expired." });
 

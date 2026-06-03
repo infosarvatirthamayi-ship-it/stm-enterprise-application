@@ -47,8 +47,10 @@ userSchema.pre('save', async function() {
         this.name = `${this.first_name} ${this.last_name || ''}`.trim();
     }
 
-    if (this.isModified('password')) {
-        const isAlreadyHashed = this.password.startsWith('$2b$') || this.password.startsWith('$2a$');
+    if (this.isModified('password') && this.password) {
+        const isAlreadyHashed = this.password.startsWith('$2b$') || 
+                                this.password.startsWith('$2a$') || 
+                                this.password.startsWith('$2y$');
         if (!isAlreadyHashed) {
             const salt = await bcrypt.genSalt(12);
             this.password = await bcrypt.hash(this.password, salt);
@@ -57,4 +59,5 @@ userSchema.pre('save', async function() {
     // 🎯 Note: No next() or next parameter mixing.
 });
 
+//module.exports = mongoose.models.User || mongoose.model('User', userSchema, 'users');
 module.exports = mongoose.models.User || mongoose.model('User', userSchema, 'users');

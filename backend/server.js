@@ -1,166 +1,84 @@
 /**
- * STM MERN Backend - Core Server Configuration
- * Handles: MongoDB connection, Razorpay setup, Static File Serving, and API Routing
+ * STM MERN Backend - Unified Production Server
  */
 
-// --- 1. INITIALIZE CORE MODULES ---
 const path = require("path");
 const fs = require("fs");
-const dotenv = require("dotenv");
-const cookieParser = require("cookie-parser");
-
-// --- 2. LOAD ENVIRONMENT VARIABLES ---
-const envResult = dotenv.config({ path: path.join(__dirname, ".env") });
-
-if (envResult.error) {
-    console.error("❌ Failed to load .env file. Check if it exists in:", __dirname);
-}
-
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const compression = require("compression");
+const cookieParser = require("cookie-parser");
+const dotenv = require("dotenv");
 
-// --- 3. DIRECTORY SETUP ---
-const directories = [
-    path.join(__dirname, 'uploads'),
-    path.join(__dirname, 'public/tickets')
-];
-
-directories.forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`✅ Directory Verified/Created: ${dir}`);
-    }
-});
+// Load Environment
+dotenv.config();
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
 
-// --- 4. DEBUG: VERIFY SYSTEM CONFIG ---
-console.log("Environment Check:", {
-    RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID ? "✅ FOUND" : "❌ MISSING",
-    MONGO_URI: process.env.MONGO_URI ? "✅ FOUND" : "❌ MISSING",
-    PORT: process.env.PORT || 5000,
-    MODE: isProduction ? 'Production' : 'Development'
-});
+// --- 1. DIRECTORY & MIDDLEWARE SETUP ---
+const directories = [path.join(__dirname, 'uploads'), path.join(__dirname, 'public/tickets')];
+directories.forEach(dir => { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); });
 
-// --- 5. MIDDLEWARE ---
-app.use(helmet({
-    crossOriginResourcePolicy: false,
-    contentSecurityPolicy: isProduction ? undefined : false,
-}));
-
+app.set('trust proxy', 1);
+app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: isProduction ? undefined : false }));
 app.use(compression());
-
-// --- FIX: ROBUST CORS WHITELIST ---
-const allowedOrigins = [
-    "http://localhost:5173", 
-    "http://localhost:3000",
-    "http://127.0.0.1:5173",
-    "https://api.sarvatirthamayi.com",
-    "https://sarvatirthamayi.com",        // 🎯 EXACT match for your site
-    "https://admin.sarvatirthamayi.com",  // 🎯 EXACT match for your admin
-    "http://sarvatirthamayi.com",
-    process.env.FRONTEND_URL,        // https://sarvatirthamayi.com
-    process.env.ADMIN_FRONTEND_URL   // https://admin.sarvatirthamayi.com
-].filter(Boolean);
-
-app.use(cors({
-    origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl)
-        if (!origin) return callback(null, true);
-        
-        if (allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            console.warn(`🛑 CORS Blocked origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"]
-}));
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// --- 6. STATIC FILES ---
+// CORS Configuration
+app.use(cors({
+    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    credentials: true
+}));
+
+// --- 2. STATIC FILES ---
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/tickets', express.static(path.join(__dirname, 'public/tickets')));
 
-// --- 7. ROUTE IMPORTS ---
-const adminRoutes = require("./routes/adminRoutes");
-const authRoutes = require('./routes/auth.routes');
+// --- 3. ROUTE IMPORTS & MOUNTING ---
+const authRoutes = require("./routes/auth.routes");
 const userRoutes = require("./routes/userRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const homeRoutes = require("./routes/homeRoutes");
 
-// Health Check
-app.get("/", (req, res) => {
-    res.status(200).send("STM MERN Backend Running 🚀");
-});
-
-// API Endpoints
-app.use('/api/admin/auth', authRoutes);
-app.use("/api/admin", adminRoutes); 
-app.use("/api/user", userRoutes);
-
-// Unified Flat Path API Router Mountings
-app.use('/api/v1', authRoutes); 
-app.use('/api/v1', userRoutes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/home', homeRoutes);
-app.use('/api/v1/admin/auth', authRoutes);
 
-// Explicit structural fallback block helper for profile matching
-app.use('/api/v1/profile', userRoutes);
+// Health Check
+app.get("/", (req, res) => res.status(200).send("STM MERN Backend Running 🚀"));
 
-// --- 8. GLOBAL ERROR HANDLER ---
+// --- 4. GLOBAL ERROR HANDLER ---
 app.use((err, req, res, next) => {
     const statusCode = err.status || 500;
     console.error(`[${new Date().toISOString()}] Error: ${err.message}`);
     res.status(statusCode).json({
         success: false,
         message: err.message || "Internal Server Error",
-        ...(isProduction ? {} : { stack: err.stack }) 
+        ...(isProduction ? {} : { stack: err.stack })
     });
 });
 
-// --- 9. DATABASE CONNECTION ---
-mongoose
-    .connect(process.env.MONGO_URI, {
-        autoIndex: true, 
-    })
-    .then(() => {
-        console.log(`✅ MongoDB Connected Successfully`);
-    })
+// --- 5. DATABASE & SERVER START ---
+mongoose.connect(process.env.MONGO_URI, { autoIndex: true })
+    .then(() => console.log(`✅ MongoDB Connected in ${process.env.NODE_ENV || 'development'} mode`))
     .catch(err => {
         console.error("❌ MongoDB Connection Error:", err.message);
-        if (isProduction) process.exit(1); 
+        if (isProduction) process.exit(1);
     });
 
-// --- 10. SERVER START (UPDATED FOR DUAL NETWORK BINDING) ---
 const PORT = process.env.PORT || 5000;
-const BASE_URL = process.env.BASE_URL || 'http://localhost';
-
-// 🎯 FIX: Listen on "0.0.0.0" instead of dropping external interfaces.
-// This forces your local laptop to accept wireless API calls from your test phone!
-const server = app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`
     ************************************************
-    🚀 Server Live: ${BASE_URL}:${PORT}
-    🌐 Local Network Connection Bridge Enabled
-    🛠️  Mode:        ${process.env.NODE_ENV || 'Development'}
+    🚀 Server Live: http://0.0.0.0:${PORT}
+    🌐 Mode: ${process.env.NODE_ENV || 'Development'}
     ************************************************
     `);
-});
-
-server.on('error', (e) => {
-    if (e.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use.`);
-        process.exit(1);
-    }
 });

@@ -9,8 +9,8 @@ import UserSignup from "../pages/user/UserSignup";
 import VerifyOtpPage from "../pages/user/VerifyOtpPage";
 import UserForgotPassword from "../pages/user/ForgotPassword";
 import UserProfile from "../pages/user/Profile";
-import JoinNow from '../pages/user/STMCLub/JoinNow';
-import JoinClub from '../pages/user/STMCLub/JoinClub';
+import JoinNow from '../pages/user/STMClub/JoinNow';
+import JoinClub from '../pages/user/STMClub/JoinClub';
 
 
 import TempleList from '../pages/user/Temples/TempleList';

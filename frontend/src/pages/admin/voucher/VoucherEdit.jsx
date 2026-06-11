@@ -51,9 +51,9 @@ export default function VoucherEdit() {
           usage_type: v.usage_type || "single",
           max_total_usage: v.max_total_usage || 1,
           max_usage_per_user: v.max_usage_per_user || 1,
-          expiry_date: v.expiry_date
-            ? new Date(v.expiry_date).toISOString().slice(0, 16)
-            : "",
+          expiry_date: v.expiry_date 
+  ? new Date(v.expiry_date).toISOString().slice(0, 16) 
+  : "",
           status: v.status ?? 1,
         });
       } catch (error) {

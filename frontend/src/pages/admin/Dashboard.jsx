@@ -1,121 +1,577 @@
-import React, { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import React, { useEffect, useMemo, useState } from "react";
+
 import {
-  Home, Users, ChevronDown, Building, Menu, ScrollText,
-  Calendar, CreditCard, BookOpen, Gift, Settings, User, LogOut, Ticket
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
+import { useAuth } from "../../context/AuthContext";
+
+import {
+  Home,
+  Users,
+  ChevronDown,
+  Building,
+  Menu,
+  ScrollText,
+  Calendar,
+  CreditCard,
+  User,
+  LogOut,
+  Ticket,
+  Gift,
+  X,
+  ShieldCheck,
 } from "lucide-react";
 
-export default function Dashboard() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const { logout } = useAuth();
-  const navigate = useNavigate();
+/*
+|--------------------------------------------------------------------------
+| Sidebar Menu Configuration
+|--------------------------------------------------------------------------
+*/
+const sidebarMenus = [
+  {
+    type: "link",
+    label: "Dashboard",
+    icon: Home,
+    to: "/admin/dashboard",
+  },
 
+  {
+    type: "link",
+    label: "Devotees",
+    icon: Users,
+    to: "/admin/user/list",
+  },
+
+  {
+    type: "dropdown",
+    label: "Temple",
+    icon: Building,
+    items: [
+      {
+        label: "Temple List",
+        to: "/admin/temple",
+      },
+      {
+        label: "Bookings",
+        to: "/admin/temple-booking",
+      },
+    ],
+  },
+
+  {
+    type: "dropdown",
+    label: "Ritual",
+    icon: ScrollText,
+    items: [
+      {
+        label: "Ritual List",
+        to: "/admin/ritual",
+      },
+      {
+        label: "Packages",
+        to: "/admin/ritual/package",
+      },
+      {
+        label: "Bookings",
+        to: "/admin/ritual-booking",
+      },
+    ],
+  },
+
+  {
+    type: "dropdown",
+    label: "Membership",
+    icon: CreditCard,
+    items: [
+      {
+        label: "Plans",
+        to: "/admin/membership-card",
+      },
+      {
+        label: "Subscriptions",
+        to: "/admin/purchased-member-card",
+      },
+    ],
+  },
+
+  {
+    type: "dropdown",
+    label: "Offers & Vouchers",
+    icon: Gift,
+    items: [
+      {
+        label: "Offers",
+        to: "/admin/offers",
+      },
+      {
+        label: "Vouchers",
+        to: "/admin/voucher",
+      },
+    ],
+  },
+
+  {
+    type: "dropdown",
+    label: "Events",
+    icon: Calendar,
+    items: [
+      {
+        label: "Event List",
+        to: "/admin/event",
+      },
+      {
+        label: "Bookings",
+        to: "/admin/event-booking",
+      },
+    ],
+  },
+
+  {
+    type: "link",
+    label: "My Profile",
+    icon: User,
+    to: "/admin/profile",
+  },
+];
+
+export default function Dashboard() {
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const { logout } = useAuth();
+
+  /*
+  |--------------------------------------------------------------------------
+  | SIDEBAR STATE
+  |--------------------------------------------------------------------------
+  */
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem("admin_sidebar_collapsed") === "true";
+  });
+
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | SAVE SIDEBAR STATE
+  |--------------------------------------------------------------------------
+  */
+  useEffect(() => {
+    localStorage.setItem(
+      "admin_sidebar_collapsed",
+      collapsed
+    );
+  }, [collapsed]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | AUTO CLOSE MOBILE SIDEBAR
+  |--------------------------------------------------------------------------
+  */
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | LOGOUT
+  |--------------------------------------------------------------------------
+  */
   const handleLogout = () => {
+
     logout();
-    navigate("/admin/login", { replace: true });
+
+    navigate("/admin/login", {
+      replace: true,
+    });
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
-      {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900 text-white flex items-center justify-between px-4 z-50">
-        <span className="font-bold text-indigo-400 tracking-tighter italic">SARVATIRTHAMAYI</span>
-        <button onClick={() => setMobileOpen(!mobileOpen)}>
-          <Menu />
-        </button>
-      </div>
+    <div className="min-h-screen bg-slate-100 flex">
 
-      {/* Sidebar */}
-      <aside className={`hidden md:flex flex-col bg-slate-900 text-white transition-all duration-300 h-screen sticky top-0 ${collapsed ? "w-20" : "w-64"}`}>
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
-          {!collapsed && <span className="font-black text-indigo-400 tracking-widest text-xs">ADMIN PANEL</span>}
-          <button onClick={() => setCollapsed(!collapsed)} className="p-1 hover:bg-slate-800 rounded transition-colors text-slate-400">
-            <Menu size={20} />
-          </button>
+      {/* Mobile Header */}
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4">
+
+        <div className="flex items-center gap-2">
+          <ShieldCheck
+            size={18}
+            className="text-indigo-400"
+          />
+
+          <span className="text-white font-black tracking-wider text-xs">
+            SARVATIRTHAMAYI
+          </span>
         </div>
-        <SidebarContent collapsed={collapsed} onLogout={handleLogout} />
+
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="text-slate-300 hover:text-white"
+        >
+          <Menu size={22} />
+        </button>
+
+      </header>
+
+      {/* Desktop Sidebar */}
+      <aside
+        className={`
+          hidden md:flex flex-col
+          bg-slate-900 border-r border-slate-800
+          sticky top-0 h-screen
+          transition-all duration-300
+          ${collapsed ? "w-20" : "w-72"}
+        `}
+      >
+
+        <SidebarHeader
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(!collapsed)}
+        />
+
+        <SidebarMenus
+          collapsed={collapsed}
+          menus={sidebarMenus}
+          onLogout={handleLogout}
+        />
+
       </aside>
 
       {/* Mobile Sidebar */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 flex">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <div className="w-64 bg-slate-900 text-white animate-in slide-in-from-left duration-300 relative z-50">
-            <SidebarContent collapsed={false} onLogout={handleLogout} />
-          </div>
+        <div className="fixed inset-0 z-50 md:hidden">
+
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+
+          {/* Sidebar */}
+          <aside className="relative z-50 w-72 h-full bg-slate-900 border-r border-slate-800 animate-in slide-in-from-left duration-300">
+
+            <div className="h-14 flex items-center justify-between px-4 border-b border-slate-800">
+
+              <div className="flex items-center gap-2">
+                <ShieldCheck
+                  size={18}
+                  className="text-indigo-400"
+                />
+
+                <span className="text-white font-black text-xs tracking-widest">
+                  ADMIN PANEL
+                </span>
+              </div>
+
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+
+            </div>
+
+            <SidebarMenus
+              collapsed={false}
+              menus={sidebarMenus}
+              onLogout={handleLogout}
+            />
+
+          </aside>
+
         </div>
       )}
 
-      {/* Main Content Area */}
-      <main className="flex-1 bg-slate-50 overflow-y-auto">
-        <div className="p-4 md:p-10 mt-14 md:mt-0 max-w-7xl mx-auto">
-          <Outlet />
+      {/* Main Content */}
+      <main className="flex-1 overflow-hidden">
+
+        <div className="h-full overflow-y-auto">
+
+          <div className="pt-20 md:pt-8 px-4 md:px-8 pb-8 max-w-7xl mx-auto">
+
+            <Outlet />
+
+          </div>
+
         </div>
+
       </main>
+
     </div>
   );
 }
 
-function SidebarContent({ collapsed, onLogout }) {
+/*
+|--------------------------------------------------------------------------
+| Sidebar Header
+|--------------------------------------------------------------------------
+*/
+function SidebarHeader({
+  collapsed,
+  onToggle,
+}) {
+
   return (
-    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-hide">
-      <SidebarLink collapsed={collapsed} to="/admin/dashboard" icon={<Home size={18} />}>Dashboard</SidebarLink>
-      <SidebarLink collapsed={collapsed} to="/admin/user/list" icon={<Users size={18} />}>Devotees</SidebarLink>
+    <div className="h-16 border-b border-slate-800 flex items-center justify-between px-4">
 
-      <Dropdown collapsed={collapsed} title="Temple" icon={<Building size={18} />} 
-        items={[{ label: "Temple List", to: "/admin/temple" }, { label: "Visits/Bookings", to: "/admin/temple-booking" }]} 
-      />
+      {!collapsed && (
+        <div>
+          <h1 className="text-white font-black text-xs tracking-[0.25em]">
+            SARVATIRTHAMAYI
+          </h1>
 
-      <Dropdown collapsed={collapsed} title="Ritual" icon={<ScrollText size={18} />} 
-        items={[
-          { label: "Ritual List", to: "/admin/ritual" },
-          { label: "Packages", to: "/admin/ritual/package" },
-          { label: "Bookings", to: "/admin/ritual-booking" }
-        ]} 
-      />
+          <p className="text-slate-500 text-[10px] uppercase tracking-widest mt-1">
+            Admin Panel
+          </p>
+        </div>
+      )}
 
-      <Dropdown collapsed={collapsed} title="Membership" icon={<CreditCard size={18} />} 
-        items={[{ label: "Plan List", to: "/admin/membership-card" }, { label: "Subscriptions", to: "/admin/purchased-member-card" }]} 
-      />
+      <button
+        onClick={onToggle}
+        className="h-9 w-9 rounded-lg flex items-center justify-center hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+      >
+        <Menu size={18} />
+      </button>
 
-      <SidebarLink collapsed={collapsed} to="/admin/voucher" icon={<Ticket size={18} />}>Vouchers</SidebarLink>
-      <SidebarLink collapsed={collapsed} to="/admin/event" icon={<Calendar size={18} />}>Events</SidebarLink>
-      <SidebarLink collapsed={collapsed} to="/admin/profile" icon={<User size={18} />}>My Profile</SidebarLink>
-
-      <div className="pt-4 mt-4 border-t border-slate-800">
-        <button onClick={onLogout} className={`flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-all ${collapsed ? "justify-center" : ""}`}>
-          <LogOut size={18} />
-          {!collapsed && <span className="font-bold uppercase tracking-widest text-[10px]">Logout</span>}
-        </button>
-      </div>
-    </nav>
+    </div>
   );
 }
 
-function SidebarLink({ to, icon, children, collapsed }) {
+/*
+|--------------------------------------------------------------------------
+| Sidebar Menus
+|--------------------------------------------------------------------------
+*/
+function SidebarMenus({
+  collapsed,
+  menus,
+  onLogout,
+}) {
+
   return (
-    <NavLink to={to} className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${isActive ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "text-slate-400 hover:bg-slate-800 hover:text-white"} ${collapsed ? "justify-center" : ""}`}>
-      {icon} {!collapsed && <span>{children}</span>}
+    <div className="flex flex-col h-full">
+
+      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1 scrollbar-hide">
+
+        {menus.map((menu) => {
+
+          if (menu.type === "link") {
+            return (
+              <SidebarLink
+                key={menu.to}
+                collapsed={collapsed}
+                to={menu.to}
+                icon={menu.icon}
+              >
+                {menu.label}
+              </SidebarLink>
+            );
+          }
+
+          return (
+            <SidebarDropdown
+              key={menu.label}
+              collapsed={collapsed}
+              title={menu.label}
+              icon={menu.icon}
+              items={menu.items}
+            />
+          );
+        })}
+
+      </nav>
+
+      {/* Logout */}
+      <div className="p-3 border-t border-slate-800">
+
+        <button
+          onClick={onLogout}
+          className={`
+            w-full flex items-center gap-3
+            px-4 py-3 rounded-xl
+            text-red-400 hover:text-red-300
+            hover:bg-red-500/10
+            transition-all
+            ${collapsed ? "justify-center" : ""}
+          `}
+        >
+
+          <LogOut size={18} />
+
+          {!collapsed && (
+            <span className="text-sm font-bold">
+              Logout
+            </span>
+          )}
+
+        </button>
+
+      </div>
+
+    </div>
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| Sidebar Link
+|--------------------------------------------------------------------------
+*/
+function SidebarLink({
+  to,
+  icon: Icon,
+  children,
+  collapsed,
+}) {
+
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `
+          flex items-center gap-3
+          px-4 py-3 rounded-xl
+          transition-all duration-200
+          text-sm font-semibold
+          ${
+            isActive
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+              : "text-slate-400 hover:bg-slate-800 hover:text-white"
+          }
+          ${collapsed ? "justify-center" : ""}
+        `
+      }
+    >
+
+      <Icon size={18} />
+
+      {!collapsed && (
+        <span>{children}</span>
+      )}
+
     </NavLink>
   );
 }
 
-function Dropdown({ title, icon, items, collapsed }) {
-  const [open, setOpen] = useState(false);
-  if (collapsed) return <div className="flex justify-center py-3 text-slate-400 hover:text-white cursor-pointer">{icon}</div>;
+/*
+|--------------------------------------------------------------------------
+| Sidebar Dropdown
+|--------------------------------------------------------------------------
+*/
+function SidebarDropdown({
+  title,
+  icon: Icon,
+  items,
+  collapsed,
+}) {
+
+  const location = useLocation();
+
+  const hasActiveChild = useMemo(() => {
+    return items.some((item) =>
+      location.pathname.startsWith(item.to)
+    );
+  }, [items, location.pathname]);
+
+  const [open, setOpen] = useState(hasActiveChild);
+
+  useEffect(() => {
+    if (hasActiveChild) {
+      setOpen(true);
+    }
+  }, [hasActiveChild]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | COLLAPSED MODE
+  |--------------------------------------------------------------------------
+  */
+  if (collapsed) {
+
+    return (
+      <div className="flex justify-center py-2">
+
+        <div className="h-11 w-11 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white cursor-pointer transition-colors">
+
+          <Icon size={18} />
+
+        </div>
+
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <button onClick={() => setOpen(!open)} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${open ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
-        <div className="flex items-center gap-3">{icon}<span className="text-sm font-bold">{title}</span></div>
-        <ChevronDown size={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+    <div className="space-y-1">
+
+      <button
+        onClick={() => setOpen(!open)}
+        className={`
+          w-full flex items-center justify-between
+          px-4 py-3 rounded-xl
+          transition-all duration-200
+          ${
+            hasActiveChild
+              ? "bg-slate-800 text-white"
+              : "text-slate-400 hover:bg-slate-800 hover:text-white"
+          }
+        `}
+      >
+
+        <div className="flex items-center gap-3">
+
+          <Icon size={18} />
+
+          <span className="text-sm font-semibold">
+            {title}
+          </span>
+
+        </div>
+
+        <ChevronDown
+          size={16}
+          className={`
+            transition-transform duration-200
+            ${open ? "rotate-180" : ""}
+          `}
+        />
+
       </button>
-      {open && <div className="ml-4 mt-1 space-y-1 border-l-2 border-slate-800 pl-2">
-        {items.map((item) => (
-          <NavLink key={item.to} to={item.to} className={({ isActive }) => `block px-4 py-2 text-[11px] font-bold uppercase tracking-tighter rounded-lg ${isActive ? "text-indigo-400" : "text-slate-500 hover:text-white"}`}>{item.label}</NavLink>
-        ))}
-      </div>}
+
+      {open && (
+        <div className="ml-5 border-l border-slate-800 pl-3 space-y-1">
+
+          {items.map((item) => (
+
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `
+                  block px-4 py-2 rounded-lg
+                  text-xs uppercase tracking-wider
+                  font-bold transition-all
+                  ${
+                    isActive
+                      ? "text-indigo-400 bg-slate-800/60"
+                      : "text-slate-500 hover:text-white"
+                  }
+                `
+              }
+            >
+              {item.label}
+            </NavLink>
+
+          ))}
+
+        </div>
+      )}
+
     </div>
   );
 }

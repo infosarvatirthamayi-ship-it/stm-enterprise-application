@@ -13,10 +13,13 @@ export default function VoucherList() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const data = await voucherService.getAll();
-      setVouchers(data.data || []);
+      const res = await voucherService.getAll();
+      // Ensure we always have an array
+      const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      setVouchers(data);
     } catch (error) {
       toast.error("Failed to load vouchers");
+      setVouchers([]); // Clear on error
     } finally {
       setLoading(false);
     }
@@ -40,6 +43,9 @@ export default function VoucherList() {
   };
 
   const filteredVouchers = useMemo(() => {
+    // 🛡️ Safety check
+    if (!Array.isArray(vouchers)) return [];
+    
     return vouchers.filter((item) =>
       item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||

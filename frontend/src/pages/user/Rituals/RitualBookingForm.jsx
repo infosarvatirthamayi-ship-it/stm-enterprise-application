@@ -4,23 +4,25 @@ import { useAuth } from "../../../context/AuthContext";
 import api from "../../../api/api";
 import { toast, Toaster } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { getFullImageUrl } from "../../../utils/config";
 import { 
   Loader2, User, CheckCircle, Calendar, Phone, 
   MessageSquare, ArrowRight, ShieldCheck, Crown, Lock, 
-  ChevronLeft, MapPin, Gift, Ticket, X, Sparkles, Info
+  ChevronLeft, MapPin, Ticket, X, Sparkles, Gift
 } from "lucide-react";
 
 export default function RitualBookingForm() {
-  const { id } = useParams();
+  const { id } = useParams(); // This is the ritual sql_id
   const navigate = useNavigate();
   const { user, loading: authLoading, dark } = useAuth();
 
   const [ritual, setRitual] = useState(null);
+  const [packages, setPackages] = useState([]);
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Voucher Discovery & Logic States
+  // Voucher logic
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [isVerifyingVoucher, setIsVerifyingVoucher] = useState(false);
@@ -34,28 +36,21 @@ export default function RitualBookingForm() {
     specialWish: ""
   });
 
-  // AUTHORIZATION CHECK
   const isAuthorizedMember = useMemo(() => {
     return Number(user?.status) === 1 && user?.membership === "active";
   }, [user]);
 
-  /**
-   * --- DYNAMIC PRICE CALCULATION ---
-   * Hierarchy: Membership Discount (25%) -> Then apply Voucher Discount
-   */
   const { finalPrice, membershipSavings, voucherSavings } = useMemo(() => {
-    const basePrice = selectedPackage?.price || 0;
+    const basePrice = Number(selectedPackage?.price || 0);
     let currentPrice = basePrice;
     let memDisc = 0;
     let vDisc = 0;
 
-    // 1. Apply Membership Discount (25% for Rituals)
     if (isAuthorizedMember && basePrice > 0) {
       memDisc = basePrice * 0.25;
       currentPrice -= memDisc;
     }
 
-    // 2. Apply Voucher Discount
     if (appliedVoucher) {
       vDisc = appliedVoucher.discountAmount;
       currentPrice = Math.max(0, currentPrice - vDisc);
@@ -72,14 +67,18 @@ export default function RitualBookingForm() {
     if (authLoading) return;
     if (!user) { navigate("/user/login"); return; }
 
-    const fetchRitual = async () => {
+    const fetchRitualData = async () => {
       try {
         setLoading(true);
-        const res = await api.get(`/user/rituals/details/${id}`);
-        const ritualData = res.data?.data || res.data;
-        setRitual(ritualData);
+        // Fetch ritual details
+        const resRitual = await api.post(`/user/ritual/show`, { ritual_id: id });
+        setRitual(resRitual.data.data);
         
-        if (ritualData.packages?.length > 0) setSelectedPackage(ritualData.packages[0]);
+        // Fetch ritual packages
+        const resPackages = await api.post(`/user/ritual/packages`, { ritual_id: id });
+        const pkgs = resPackages.data.data.data || [];
+        setPackages(pkgs);
+        if (pkgs.length > 0) setSelectedPackage(pkgs[0]);
 
         setFormData(prev => ({
           ...prev,
@@ -87,15 +86,15 @@ export default function RitualBookingForm() {
           whatsappNumber: user.mobile_number || ""
         }));
       } catch (err) {
-        toast.error("Ritual details not found");
+        toast.error("Failed to load booking details");
       } finally {
         setLoading(false);
       }
     };
-    fetchRitual();
+    window.scrollTo(0, 0);
+    fetchRitualData();
   }, [id, authLoading, user, navigate]);
 
-  // VOUCHER DISCOVERY LOGIC
   const openCouponDiscovery = async () => {
     try {
       const res = await api.get("/user/vouchers/available?type=ritual");
@@ -112,9 +111,7 @@ export default function RitualBookingForm() {
     
     setIsVerifyingVoucher(true);
     try {
-      // Pass the price after membership for verification
       const midPrice = isAuthorizedMember ? (selectedPackage.price * 0.75) : selectedPackage.price;
-      
       const res = await api.post("/user/vouchers/verify", {
         code: targetCode,
         amount: midPrice,
@@ -144,37 +141,41 @@ export default function RitualBookingForm() {
     
     setSubmitting(true);
     try {
-      const res = await api.post("/user/rituals/create-order", {
-        ritualId: id,
-        packageId: selectedPackage._id,
-        voucherCode: appliedVoucher?.code
+      // 1. Create the Order
+      const res = await api.post("/user/ritual/booking", {
+        temple_id: ritual.temple_id,
+        ritual_id: id,
+        ritual_package_id: selectedPackage.id,
+        date: formData.bookingDate,
+        whatsAppNumber: formData.whatsappNumber,
+        devoteeName: formData.devoteeName,
+        wish: formData.specialWish,
+        offerId: appliedVoucher?.voucherId
       });
 
       const orderData = res.data.data;
+      
+      // 2. Open Razorpay
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: orderData.amount,
-        order_id: orderData.id,
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || orderData.payment.razorpay_public_key,
+        amount: Math.round(Number(finalPrice) * 100),
+        order_id: orderData.payment.razorpay_order_id,
         name: "Sarvatirthamayi",
         description: `Sacred Ritual: ${ritual?.name}`,
         handler: async (response) => {
           try {
-            const verifyRes = await api.post("/user/rituals/verify-booking", {
-              ...response,
-              bookingData: { 
-                ...formData, 
-                ritualId: id, 
-                packageId: selectedPackage._id,
-                templeId: ritual.temple_id?._id,
-                voucherCode: appliedVoucher?.code 
-              }
+            // 3. Verify the Payment
+            const verifyRes = await api.post("/user/ritual/verify-payment", {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
             });
 
             if (verifyRes.data.success) {
               toast.success("Ritual Booked Successfully!");
               navigate("/booking-success", { 
                 state: { 
-                  receiptUrl: verifyRes.data.data.receiptUrl,
+                  receiptUrl: "success", // Mock receipt for now
                   bookingDetails: formData,
                   ritualName: ritual.name
                 } 
@@ -185,142 +186,191 @@ export default function RitualBookingForm() {
           }
         },
         prefill: { name: formData.devoteeName, contact: formData.whatsappNumber },
-        theme: { color: "#8E44AD" },
+        theme: { color: "#4F46E5" }, // Indigo-600
         modal: { ondismiss: () => setSubmitting(false) }
       };
       new window.Razorpay(options).open();
     } catch (err) {
-      toast.error("Payment Initiation Failed");
+      toast.error(err.response?.data?.message || "Payment Initiation Failed");
       setSubmitting(false);
     }
   };
 
   if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
-      <Loader2 className="animate-spin text-purple-600 mb-4" size={50} />
-      <h2 className="text-xl font-bold text-slate-700 dark:text-slate-300 tracking-widest uppercase italic">Invoking Sacred Space...</h2>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#f8fafc]">
+      <Loader2 className="animate-spin text-indigo-600 mb-4" size={40} />
+      <h2 className="text-xs font-black text-slate-500 tracking-[0.2em] uppercase">Securing Sanctuary...</h2>
     </div>
   );
 
   return (
-    <div className={`min-h-screen pt-24 pb-12 transition-all duration-300 ${dark ? 'bg-[#0f172a] text-white' : 'bg-[#f8fafc] text-slate-900'}`}>
+    <div className={`min-h-screen pt-24 pb-12 transition-all duration-300 ${dark ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'} font-sans`}>
       <Toaster position="top-right" />
-      <main className="max-w-6xl mx-auto px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6">
+        
+        <button onClick={() => navigate(-1)} className="group mb-8 flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-all font-bold uppercase tracking-wider text-[10px] w-fit">
+            <div className="p-2 rounded-lg bg-white shadow-sm group-hover:bg-indigo-50 border border-slate-200">
+              <ChevronLeft size={16} />
+            </div>
+            Back to Options
+        </button>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
           
-          {/* SIDEBAR: Ritual Info & Price Summary */}
+          {/* --- LEFT SIDEBAR: Ritual Info & Packages --- */}
           <div className="lg:col-span-5 lg:sticky lg:top-28">
-            <div className="bg-white dark:bg-slate-900 rounded-[3rem] overflow-hidden shadow-2xl border dark:border-slate-800">
-              <div className="h-64 relative">
-                <img src={ritual?.image} alt={ritual?.name} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] to-transparent"></div>
-                <button onClick={() => navigate(-1)} className="absolute top-6 left-6 p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all"><ChevronLeft size={20}/></button>
-                <div className="absolute bottom-6 left-8 right-8 text-white">
-                   <h2 className="text-3xl font-black mb-1 italic leading-tight">{ritual?.name}</h2>
-                   <div className="flex items-center gap-2 opacity-80 text-sm font-bold uppercase tracking-widest"><MapPin size={16} className="text-purple-400"/> {ritual?.temple_id?.name || "Sacred Site"}</div>
+            <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-xl border border-slate-200 dark:border-slate-700">
+              <div className="h-56 relative">
+                <img src={getFullImageUrl(ritual?.image)} alt={ritual?.name} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
+                <div className="absolute bottom-6 left-6 right-6 text-white">
+                   <h2 className="text-2xl font-black mb-1 leading-tight tracking-tight">{ritual?.name}</h2>
+                   <div className="flex items-center gap-1.5 opacity-80 text-[10px] font-black uppercase tracking-widest">
+                      <MapPin size={12} className="text-indigo-400"/> {ritual?.temple_name || "Sacred Site"}
+                   </div>
                 </div>
               </div>
               
-              <div className="p-8 space-y-6">
+              <div className="p-6 md:p-8 space-y-6">
                 <div className="space-y-3">
-                  <p className="text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] px-2">Select Ritual Package</p>
-                  {ritual?.packages?.map((pkg) => (
+                  <p className="text-[10px] uppercase font-black text-slate-400 tracking-[0.15em] px-2 mb-3">Select Package</p>
+                  {packages.map((pkg) => (
                     <div 
-                      key={pkg._id}
+                      key={pkg.id}
                       onClick={() => { setSelectedPackage(pkg); setAppliedVoucher(null); }}
-                      className={`p-5 rounded-[2rem] border-2 cursor-pointer transition-all flex justify-between items-center ${selectedPackage?._id === pkg._id ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/10 shadow-lg' : 'border-slate-100 dark:border-slate-800'}`}
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex justify-between items-center ${selectedPackage?.id === pkg.id ? 'border-indigo-600 bg-indigo-50/50 shadow-md' : 'border-slate-100 hover:border-slate-200'}`}
                     >
-                      <span className={`font-bold ${selectedPackage?._id === pkg._id ? 'text-purple-700 dark:text-purple-400' : 'text-slate-600'}`}>{pkg.name}</span>
-                      <span className="font-black text-lg">₹{pkg.price}</span>
+                      <span className={`text-sm font-bold ${selectedPackage?.id === pkg.id ? 'text-indigo-700' : 'text-slate-600'}`}>{pkg.name}</span>
+                      <span className="font-black text-slate-800">₹{pkg.price}</span>
                     </div>
                   ))}
+                  {packages.length === 0 && (
+                     <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl text-xs font-bold text-center border border-rose-100">No packages currently available for this ritual.</div>
+                  )}
                 </div>
 
                 {/* DYNAMIC PRICE SUMMARY */}
-                <div className="p-6 bg-purple-50 dark:bg-purple-900/20 rounded-[2.5rem] border border-purple-100 dark:border-purple-800/50">
-                    <div className="space-y-3 mb-4">
-                        <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-wider"><span>Package Price</span><span>₹{selectedPackage?.price}</span></div>
-                        {isAuthorizedMember && (
-                            <div className="flex justify-between text-[10px] font-black text-emerald-600 uppercase">
-                                <span className="flex items-center gap-1.5"><ShieldCheck size={12}/> Membership Discount (25%)</span>
-                                <span>-₹{membershipSavings}</span>
-                            </div>
-                        )}
-                        {appliedVoucher && (
-                            <div className="flex justify-between text-[10px] font-black text-indigo-600 uppercase animate-in slide-in-from-right-2">
-                                <span className="flex items-center gap-1.5"><Ticket size={12}/> Divine Coupon</span>
-                                <span>-₹{voucherSavings}</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex justify-between items-center pt-4 border-t border-purple-200 dark:border-purple-800">
-                        <span className="text-[10px] uppercase font-black text-purple-600 tracking-[0.2em]">Total Payable</span>
-                        <span className="text-4xl font-black text-purple-700 dark:text-purple-400">₹{finalPrice}</span>
-                    </div>
-                </div>
+                {selectedPackage && (
+                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                      <div className="flex justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                          <span>Base Price</span><span>₹{selectedPackage?.price}</span>
+                      </div>
+                      {isAuthorizedMember && (
+                          <div className="flex justify-between text-[10px] font-black text-emerald-600 uppercase">
+                              <span className="flex items-center gap-1.5"><ShieldCheck size={12}/> Member Savings (25%)</span>
+                              <span>-₹{membershipSavings}</span>
+                          </div>
+                      )}
+                      {appliedVoucher && (
+                          <div className="flex justify-between text-[10px] font-black text-indigo-600 uppercase animate-in slide-in-from-right-2">
+                              <span className="flex items-center gap-1.5"><Ticket size={12}/> Promo Applied</span>
+                              <span>-₹{voucherSavings}</span>
+                          </div>
+                      )}
+                      <div className="flex justify-between items-center pt-4 border-t border-slate-200 mt-2">
+                          <span className="text-xs uppercase font-black text-slate-800 tracking-wider">Total</span>
+                          <span className="text-3xl font-black text-indigo-600 tracking-tight">₹{finalPrice}</span>
+                      </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* FORM SECTION */}
+          {/* --- RIGHT: FORM SECTION --- */}
           <div className="lg:col-span-7 space-y-6">
+            
             {/* MEMBER BADGE / UPSELL */}
-            <div className="mb-2">
-              {isAuthorizedMember ? (
-                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-4 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-8 py-5 rounded-[2.5rem] border border-emerald-500/20 shadow-sm relative overflow-hidden">
-                  <Sparkles size={40} className="absolute -right-2 top-0 opacity-20 rotate-12" />
-                  <Crown size={28} className="fill-current" />
-                  <div><p className="text-xs font-black uppercase tracking-widest leading-none">Authorized Sovereign Member</p><p className="text-[10px] font-medium opacity-80 mt-1.5 uppercase">Exclusive 25% ritual savings are applied.</p></div>
-                </motion.div>
-              ) : (
-                <motion.div whileHover={{ y: -2 }} className="p-6 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-[2.5rem] border border-amber-500/20 relative overflow-hidden group">
-                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="max-w-[70%]">
-                      <h4 className="text-amber-700 dark:text-amber-400 font-black text-sm flex items-center gap-2 uppercase tracking-tighter"><Gift size={18} /> Unlock Member Savings</h4>
-                      <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium mt-1 uppercase tracking-tight">Authorized members save <span className="font-bold">25% on every ritual package</span> instantly.</p>
-                    </div>
-                    <button onClick={() => navigate("/user/stm-club")} className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-500/30 hover:bg-amber-600 transition-all shrink-0">Join STM Club</button>
+            {isAuthorizedMember ? (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4 bg-emerald-50 text-emerald-700 px-6 py-4 rounded-2xl border border-emerald-200 shadow-sm relative overflow-hidden">
+                <Crown size={24} className="fill-emerald-200 shrink-0" />
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest leading-none mb-1">Active STM Member</p>
+                  <p className="text-[10px] font-bold opacity-80 uppercase">25% Discount Applied Automatically</p>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div whileHover={{ y: -2 }} className="p-5 sm:p-6 bg-amber-50 rounded-2xl border border-amber-200 relative overflow-hidden group shadow-sm">
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-amber-800 font-black text-xs sm:text-sm flex items-center gap-2 uppercase tracking-wider"><Gift size={16} /> STM Club Exclusive</h4>
+                    <p className="text-amber-700/80 text-[10px] sm:text-[11px] font-bold mt-1 uppercase tracking-tight">Members get <span className="font-black text-amber-600">25% OFF</span> all ritual bookings.</p>
                   </div>
-                  <Crown size={80} className="absolute -bottom-4 -right-4 text-amber-500/10 group-hover:rotate-12 transition-transform" />
-                </motion.div>
-              )}
-            </div>
+                  <button onClick={() => navigate("/user/stm-club")} className="bg-amber-500 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md shadow-amber-200 hover:bg-amber-600 transition-all shrink-0">Join Now</button>
+                </div>
+              </motion.div>
+            )}
 
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-slate-900 rounded-[3.5rem] p-10 lg:p-14 shadow-2xl border dark:border-slate-800">
-              <h3 className="text-3xl font-black mb-10 italic tracking-tight">Ritual Sankalpa</h3>
-              <div className="space-y-8">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-6 sm:p-10 shadow-xl border border-slate-200 dark:border-slate-700">
+              <h3 className="text-2xl font-black mb-8 tracking-tight text-slate-800">Booking Details</h3>
+              
+              <div className="space-y-6">
                 {/* VOUCHER DISCOVERY UI */}
-                <div className="p-6 bg-slate-50 dark:bg-slate-800/40 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-3"><Ticket className="text-indigo-600" size={18}/><h4 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-400">Apply Promo Code</h4></div>
-                    <button onClick={openCouponDiscovery} className="text-[10px] font-black text-indigo-600 hover:underline uppercase tracking-tighter flex items-center gap-1"><Sparkles size={12}/> View Offers</button>
+                <div className="p-5 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2"><Ticket className="text-indigo-600" size={16}/><h4 className="font-black text-[10px] uppercase tracking-widest text-slate-500">Have a Code?</h4></div>
+                    <button onClick={openCouponDiscovery} className="text-[10px] font-black text-indigo-600 hover:underline uppercase tracking-wider flex items-center gap-1"><Sparkles size={12}/> View Offers</button>
                   </div>
                   {appliedVoucher ? (
-                    <div className="flex items-center justify-between bg-indigo-600 text-white p-5 rounded-3xl shadow-xl animate-in zoom-in-95 duration-300">
-                      <div className="flex items-center gap-3"><CheckCircle size={22}/><p className="font-black text-xl tracking-[0.3em] ml-2">{appliedVoucher.code}</p></div>
-                      <button onClick={() => setAppliedVoucher(null)} className="p-2 hover:bg-white/20 rounded-full transition-colors"><X size={20}/></button>
+                    <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 text-indigo-700 p-4 rounded-xl shadow-sm animate-in zoom-in-95 duration-300">
+                      <div className="flex items-center gap-3"><CheckCircle size={18}/><p className="font-black text-sm tracking-widest">{appliedVoucher.code}</p></div>
+                      <button onClick={() => setAppliedVoucher(null)} className="p-1.5 hover:bg-indigo-100 rounded-lg transition-colors"><X size={16}/></button>
                     </div>
                   ) : (
-                    <div className="flex gap-3">
-                      <input type="text" placeholder="ENTER CODE" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} className="flex-1 h-14 px-8 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl outline-none font-bold focus:border-indigo-500 transition-all uppercase text-sm tracking-widest"/>
-                      <button onClick={() => handleApplyVoucher()} disabled={isVerifyingVoucher || !voucherCode} className="px-10 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all text-xs uppercase tracking-widest">{isVerifyingVoucher ? <Loader2 className="animate-spin" size={16}/> : "Apply"}</button>
+                    <div className="flex gap-2">
+                      <input type="text" placeholder="ENTER PROMO" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} className="flex-1 h-12 px-4 bg-white border border-slate-200 rounded-xl outline-none font-bold focus:border-indigo-500 transition-all uppercase text-xs tracking-widest"/>
+                      <button onClick={() => handleApplyVoucher()} disabled={isVerifyingVoucher || !voucherCode} className="px-6 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all text-[10px] uppercase tracking-widest">{isVerifyingVoucher ? <Loader2 className="animate-spin" size={14}/> : "Apply"}</button>
                     </div>
                   )}
                 </div>
 
-                <div className="relative group"><label className="absolute left-14 -top-2.5 px-2 bg-white dark:bg-slate-900 text-[10px] font-black uppercase text-slate-400 group-focus-within:text-purple-600 z-10">Ritual Date</label><Calendar className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={20}/><input type="date" min={new Date().toISOString().split("T")[0]} className="w-full h-16 pl-16 pr-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 focus:border-purple-500 rounded-2xl outline-none font-bold transition-all" onChange={(e) => setFormData({...formData, bookingDate: e.target.value})}/></div>
+                {/* FORM INPUTS */}
+                <div className="space-y-5">
+                    <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2 px-2">Ritual Date <span className="text-rose-500">*</span></label>
+                        <div className="relative">
+                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                            <input type="date" min={new Date().toISOString().split("T")[0]} className="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl outline-none font-bold transition-all text-sm text-slate-700" onChange={(e) => setFormData({...formData, bookingDate: e.target.value})}/>
+                        </div>
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="relative"><User className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={20}/><input placeholder="Devotee Name" value={formData.devoteeName} className="w-full h-16 pl-16 pr-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none font-bold focus:border-purple-500 border-2 border-transparent transition-all shadow-inner" onChange={(e) => setFormData({...formData, devoteeName: e.target.value})}/></div>
-                  <div className="relative"><Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={20}/><input placeholder="WhatsApp Number" value={formData.whatsappNumber} className="w-full h-16 pl-16 pr-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none font-bold focus:border-purple-500 border-2 border-transparent transition-all shadow-inner" onChange={(e) => setFormData({...formData, whatsappNumber: e.target.value})}/></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2 px-2">Devotee Name <span className="text-rose-500">*</span></label>
+                        <div className="relative">
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                            <input placeholder="Full Name" value={formData.devoteeName} className="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl outline-none font-bold transition-all text-sm text-slate-700" onChange={(e) => setFormData({...formData, devoteeName: e.target.value})}/>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2 px-2">WhatsApp No. <span className="text-rose-500">*</span></label>
+                        <div className="relative">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                            <input placeholder="10 Digit Number" value={formData.whatsappNumber} className="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl outline-none font-bold transition-all text-sm text-slate-700" onChange={(e) => setFormData({...formData, whatsappNumber: e.target.value})}/>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2 px-2">Special Sankalpa / Wish</label>
+                        <div className="relative">
+                            <MessageSquare className="absolute left-4 top-4 text-slate-400" size={18}/>
+                            <textarea placeholder="Include Gotra, Nakshatra, or specific prayers..." className="w-full py-4 pl-12 pr-4 h-32 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl outline-none font-medium resize-none transition-all text-sm text-slate-600" onChange={(e) => setFormData({...formData, specialWish: e.target.value})}/>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="relative"><MessageSquare className="absolute left-6 top-7 text-slate-400" size={20}/><textarea placeholder="Gotra, Rashi, or Special Sankalpa Wishes..." className="w-full py-6 pl-16 pr-4 h-40 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none font-medium resize-none shadow-inner border-2 border-transparent focus:border-purple-500 transition-all" onChange={(e) => setFormData({...formData, specialWish: e.target.value})}/></div>
-
-                <button onClick={handlePayment} disabled={submitting} className="group w-full bg-purple-600 text-white h-24 rounded-[2.5rem] font-black text-2xl shadow-2xl hover:bg-purple-700 active:scale-[0.98] transition-all flex items-center justify-center gap-5 disabled:opacity-50 relative overflow-hidden">
-                  {submitting ? <Loader2 className="animate-spin" size={32} /> : (<><Lock size={24} className="text-purple-300"/><span>Pay ₹{finalPrice} & Confirm</span><ArrowRight size={28} className="group-hover:translate-x-2 transition-transform"/></>)}
+                <button 
+                    onClick={handlePayment} 
+                    disabled={submitting || !selectedPackage || !formData.bookingDate || !formData.devoteeName} 
+                    className="group w-full bg-indigo-600 text-white h-16 rounded-2xl font-black text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:active:scale-100 mt-8"
+                >
+                  {submitting ? <Loader2 className="animate-spin" size={24} /> : (<><Lock size={18} className="text-indigo-300"/><span>Pay ₹{finalPrice}</span><ArrowRight size={20} className="group-hover:translate-x-1 transition-transform"/></>)}
                 </button>
-                <div className="flex items-center justify-center gap-4 pt-2 opacity-50"><img src="https://upload.wikimedia.org/wikipedia/commons/8/89/Razorpay_logo.svg" className="h-4" alt="Razorpay"/><span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Secured Gateway Connection</span></div>
+                <div className="flex items-center justify-center gap-3 pt-2 opacity-40 grayscale">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/8/89/Razorpay_logo.svg" className="h-3" alt="Razorpay"/>
+                    <span className="text-[9px] font-black uppercase tracking-widest">Secured Gateway</span>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -330,18 +380,28 @@ export default function RitualBookingForm() {
       {/* OFFER DISCOVERY MODAL */}
       <AnimatePresence>
         {showCouponModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#0f172a]/80 backdrop-blur-md">
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] p-10 shadow-2xl border dark:border-slate-800 relative overflow-hidden">
-              <Sparkles className="absolute -top-6 -left-6 text-indigo-500/10 w-32 h-32" />
-              <div className="flex justify-between items-center mb-8 relative z-10"><h3 className="text-2xl font-black italic tracking-tighter">Ritual Offers</h3><button onClick={() => setShowCouponModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={24}/></button></div>
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 relative z-10">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} className="bg-white w-full max-w-sm rounded-[2rem] p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+              <div className="flex justify-between items-center mb-6 relative z-10">
+                  <h3 className="text-xl font-black tracking-tight text-slate-800">Available Promos</h3>
+                  <button onClick={() => setShowCouponModal(false)} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-700"><X size={20}/></button>
+              </div>
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                 {availableCoupons.length > 0 ? availableCoupons.map((cpn) => (
-                  <motion.div key={cpn._id} whileHover={{ x: 5 }} onClick={() => handleApplyVoucher(cpn.code)} className="p-6 border-2 border-indigo-50 dark:border-indigo-900/30 rounded-[2.5rem] cursor-pointer hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-all group">
-                    <div className="flex justify-between items-start mb-2"><span className="font-mono font-black text-indigo-600 text-xl tracking-[0.2em]">{cpn.code}</span><span className="text-[10px] font-black bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-full uppercase tracking-tighter">{cpn.discount_type === 'percentage' ? `${cpn.discount_value}% OFF` : `₹${cpn.discount_value} OFF`}</span></div>
-                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{cpn.description || "Divine savings for your sacred ritual."}</p>
-                  </motion.div>
+                  <div key={cpn.id} onClick={() => handleApplyVoucher(cpn.code)} className="p-4 border border-indigo-100 bg-indigo-50/30 rounded-2xl cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-all group">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="font-mono font-black text-indigo-700 text-sm tracking-widest">{cpn.code}</span>
+                        <span className="text-[9px] font-black bg-indigo-600 text-white px-2 py-1 rounded shadow-sm uppercase tracking-wider">
+                            {cpn.discount_type === 'percentage' ? `${cpn.discount_value}% OFF` : `₹${cpn.discount_value} OFF`}
+                        </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium leading-snug">{cpn.description || "Applicable on your ritual booking."}</p>
+                  </div>
                 )) : (
-                  <div className="text-center py-10 opacity-50"><Ticket size={40} className="mx-auto mb-4" /><p className="text-sm font-bold uppercase tracking-widest">No Ritual Offers Today</p></div>
+                  <div className="text-center py-10 opacity-40">
+                      <Ticket size={32} className="mx-auto mb-3 text-slate-400" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">No Offers Found</p>
+                  </div>
                 )}
               </div>
             </motion.div>

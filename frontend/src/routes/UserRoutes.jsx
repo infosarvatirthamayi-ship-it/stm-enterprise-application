@@ -12,7 +12,11 @@ import UserProfile from "../pages/user/Profile";
 import JoinNow from '../pages/user/STMCLub/JoinNow';
 import JoinClub from '../pages/user/STMCLub/JoinClub';
 
-import TemplesIndex from '../pages/user/Temples/index';
+
+import TempleList from '../pages/user/Temples/TempleList';
+import TempleView from '../pages/user/Temples/TempleView';
+import TempleBooking from '../pages/user/Temples/TempleBooking';
+
 import AssistanceIndex from '../pages/user/TempleAssistance/index';
 
 import RitualPage from '../pages/user/Rituals/ritualpage';
@@ -25,6 +29,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import BookingForm from "../pages/user/TempleAssistance/BookingForm";
 import MembershipSuccess from "../pages/user/STMClub/MembershipSuccess"; // Import the success component
 
+
 export const UserRoutes = [
     /* Public User Routes */
     <Route key="landing" path="/" element={<LandingPage />} />,
@@ -36,7 +41,11 @@ export const UserRoutes = [
     
     /* User Features */
     <Route key="stm-club" path="/user/stm-club" element={<JoinNow />} />,
-    <Route key="temples" path="/user/temples" element={<TemplesIndex />} />,
+    
+    <Route key="temples" path="/user/temples" element={<TempleList />} />,
+    <Route key="temple-view" path="/user/temples/:id" element={<TempleView />} />,
+
+
     <Route key="assistance" path="/user/temple-assistance" element={<AssistanceIndex />} />,
     
     <Route key="rituals-list" path="/user/rituals" element={<RitualPage />} />,

@@ -15,6 +15,9 @@ const ritualTypeController = require("../controllers/ritualTypeController");
 const ritualBookingController = require("../controllers/ritualBookingController");
 const ritualPackageController = require("../controllers/ritualPackageController");
 const purchasedCardAdminController = require("../controllers/purchasedCardController");
+
+const offerController = require("../controllers/offerController");
+
 const voucherController = require("../controllers/voucherController");
 const templeController = require('../controllers/templeController');
 const templeBookingController = require("../controllers/templeBookingController");
@@ -24,6 +27,10 @@ const ritualController = require("../controllers/ritualController");
 const adminController = require("../controllers/adminController");
 const forgotPasswordController = require("../controllers/forgotPassword.controller");
 const userController = require("../controllers/userController");
+
+
+const eventController = require("../controllers/eventController");
+const eventBookingController = require("../controllers/eventBookingController"); // Create this if missing
 
 // --- 1. CONFIGURE MULTER STORAGE ---
 const storage = multer.diskStorage({
@@ -112,5 +119,48 @@ router.post("/vouchers/create", voucherController.createVoucher);
 router.put("/vouchers/update/:id", voucherController.updateVoucher);
 router.delete("/vouchers/:id", voucherController.deleteVoucher);
 router.get("/vouchers/download/:id", voucherController.downloadVoucherLeaflet);
+
+// 🎯 ADD THIS for the individual ID routes:
+router.get("/vouchers/:id", voucherController.getVoucherById);
+
+
+router.get("/events", eventController.getAllEvents);
+router.get("/events/:id", eventController.getEventById);
+router.post("/events", upload.single('image'), eventController.createEvent);
+router.put("/events/update/:id", upload.single('image'), eventController.updateEvent);
+router.delete("/events/:id", eventController.deleteEvent);
+// --- Event Bookings ---
+
+
+router.get("/event-bookings/count", eventBookingController.getTotalBookingsCount);
+
+// 2. Everything else
+router.get("/event-bookings/:id", eventBookingController.getBookingById);
+router.delete("/event-bookings/:id", eventBookingController.deleteBooking);
+router.get("/event-bookings", eventBookingController.getAllBookings);
+
+// --- Offer Management ---
+router.get("/offers", offerController.getOffers);
+
+router.get("/offers/:id", offerController.getOfferById);
+
+router.post(
+    "/offers/create",
+    upload.single("image"),
+    offerController.createOffer
+);
+
+router.put(
+    "/offers/update/:id",
+    upload.single("image"),
+    offerController.updateOffer
+);
+
+router.delete(
+    "/offers/:id",
+    offerController.deleteOffer
+);
+
+
 
 module.exports = router;

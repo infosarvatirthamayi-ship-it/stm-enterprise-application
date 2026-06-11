@@ -3,7 +3,8 @@ const router = express.Router();
 
 // --- Controllers ---
 const aboutController = require("../controllers/user/aboutController");
-const joinNowController = require("../controllers/user/join-nowController");
+//const joinNowController = require("../controllers/user/join-nowController");
+const joinNowController = require("../controllers/user/joinNowController");
 const userController = require("../controllers/user/userController");
 const templeBookingController = require("../controllers/user/templeBookingController");
 const ritualController = require("../controllers/user/ritualController");
@@ -90,7 +91,8 @@ router.get("/temple-assistants/:templeId", userController.getAssistantsByTemple)
 router.post("/temple/booking", protect, templeBookingController.createTempleBookingOrder);
 router.post("/temple/verify-payment", protect, templeBookingController.verifyAndConfirmBooking);
 router.get("/temple/booking-details", protect, templeBookingController.getMyBookings);
-
+ 
+router.get("/rituals", ritualController.getAllRituals);
 router.post("/ritual/index", protect, ritualController.getRitualsByTemple);
 router.post("/ritual/show", protect, ritualController.getRitualShow);
 router.post("/ritual/packages", protect, ritualController.getRitualPackages);

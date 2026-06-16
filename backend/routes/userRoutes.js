@@ -83,10 +83,10 @@ router.post("/vouchers/verify", protect, userVoucherController.verifyVoucherForU
 router.get("/vouchers/available", protect, userVoucherController.getAvailableVouchers);
 
 // Temples, Rituals, Donations
-router.get("/temple/index", protect, joinNowController.getPublicTemples);
-router.post("/temple/show", protect, joinNowController.getPublicTempleById);
+router.get("/temple/index", joinNowController.getPublicTemples);
+router.post("/temple/show", joinNowController.getPublicTempleById);
 router.get("/temples", joinNowController.getPublicTemples);
-router.get("/temples/:id", protect, joinNowController.getPublicTempleById);
+router.get("/temples/:id", joinNowController.getPublicTempleById);
 router.get("/temple-assistants/:templeId", userController.getAssistantsByTemple);
 router.post("/temple/booking", protect, templeBookingController.createTempleBookingOrder);
 router.post("/temple/verify-payment", protect, templeBookingController.verifyAndConfirmBooking);

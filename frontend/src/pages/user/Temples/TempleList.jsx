@@ -61,12 +61,16 @@ export default function TempleList() {
       <Navbar />
 
       {/* Hero Section with proper top-padding to prevent Navbar overlap */}
-      <section className="relative h-[45vh] flex items-center justify-center bg-slate-900 pt-20">
+      {/* Hero Section - Flexbox removed, physical padding applied */}
+      {/* Hero Section - Using inline styles to bypass Tailwind cache issues */}
+      <section className="relative min-h-[650px] flex items-center justify-center bg-slate-900 overflow-hidden">
+      
         <img src={heroBg} className="absolute inset-0 w-full h-full object-cover brightness-[0.35]" alt="Hero" />
-        <div className="relative z-10 text-center px-6 max-w-2xl">
+        
+        <div className="relative z-10 max-w-3xl mx-auto text-center w-full">
           <h1 className="text-4xl md:text-6xl font-black text-white mb-8 tracking-tight">Verified Temples</h1>
           
-          <div className="relative group">
+          <div className="relative group text-left">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-white/60" size={20} />
             <input 
               type="text" 
@@ -80,6 +84,7 @@ export default function TempleList() {
         </div>
       </section>
 
+      
       {/* Grid Section */}
       <section className="py-12 px-4 max-w-7xl mx-auto">
         <AnimatePresence mode="wait">

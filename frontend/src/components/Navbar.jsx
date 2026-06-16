@@ -52,165 +52,307 @@ export default function Navbar() {
   };
 
   return (
-    <nav 
-      className={`fixed w-full z-[999] transition-all duration-700 
-        ${scrolled 
-          ? "py-3 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)]" 
-          : "py-6 bg-transparent"}`}
-    >
-      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-        
-        {/* --- BRANDING --- */}
-        <RouterLink to="/" className="relative group z-[1001]">
-          <span className="text-2xl font-black tracking-tighter flex items-center">
-            <span className="text-indigo-600 dark:text-amber-400">SARVA</span>
-            <span className={`transition-colors duration-500 ${isTransparent ? "text-white" : "text-slate-900 dark:text-white"}`}>
-              TIRTHAM
-            </span>
+     <nav
+  className={`
+    fixed
+    top-4
+    left-1/2
+    -translate-x-1/2
+    w-[96%]
+    max-w-7xl
+    h-20
+    z-[999]
+    rounded-3xl
+    transition-all
+    duration-500
+    ${
+      scrolled
+        ? "bg-white/85 dark:bg-slate-950/85 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] border border-white/20"
+        : "bg-black/20 backdrop-blur-md border border-white/10"
+    }
+  `}
+>
+  <div className="h-full px-8 flex items-center justify-between">
+
+    {/* Logo */}
+    <RouterLink to="/" className="group">
+      <div className="flex items-center">
+        <span className="text-3xl font-black tracking-tight">
+          <span className="text-indigo-600">SARVA</span>
+          <span
+            className={`${
+              isTransparent
+                ? "text-white"
+                : "text-slate-900 dark:text-white"
+            }`}
+          >
+            TIRTHAM
           </span>
-          <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full" />
-        </RouterLink>
-
-        {/* --- DESKTOP MENU --- */}
-        <div className="hidden lg:flex items-center gap-10">
-          {navLinks.map((link) => (
-            <div key={link.name} className="relative group">
-              {link.isScroll && isHomePage ? (
-                <ScrollLink
-                  to={link.to}
-                  smooth={true}
-                  className={`cursor-pointer text-sm font-bold uppercase tracking-widest transition-all duration-500 hover:text-indigo-600 ${isTransparent ? "text-white/80" : "text-slate-600 dark:text-slate-400"}`}
-                >
-                  {link.name}
-                </ScrollLink>
-              ) : (
-                <RouterLink
-                  to={link.path}
-                  className={`text-sm font-bold uppercase tracking-widest transition-all duration-500 hover:text-indigo-600 ${location.pathname === link.path ? "text-indigo-600" : (isTransparent ? "text-white/80" : "text-slate-600 dark:text-slate-400")}`}
-                >
-                  {link.name}
-                </RouterLink>
-              )}
-            </div>
-          ))}
-
-          <RouterLink 
-            to="/user/stm-club" 
-            className="group relative px-5 py-2 overflow-hidden rounded-full border border-amber-400/30 bg-amber-400/5 transition-all hover:bg-amber-400 hover:shadow-[0_0_20px_rgba(251,191,36,0.3)]"
-          >
-            <span className="relative z-10 text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 group-hover:text-amber-950">
-              STM Club
-            </span>
-          </RouterLink>
-
-          {/* SERVICES DROPDOWN */}
-          <div 
-            className="relative" 
-            onMouseEnter={() => setActiveDropdown('services')} 
-            onMouseLeave={() => setActiveDropdown(null)}
-          >
-            <button className={`flex items-center gap-1.5 text-sm font-bold uppercase tracking-widest transition-all ${isTransparent ? "text-white/80" : "text-slate-600 dark:text-slate-400"}`}>
-              Services <HiChevronDown className={`transition-transform duration-300 ${activeDropdown === 'services' ? 'rotate-180' : ''}`} />
-            </button>
-            <AnimatePresence>
-              {activeDropdown === 'services' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }} 
-                  animate={{ opacity: 1, y: 0, scale: 1 }} 
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute left-1/2 -translate-x-1/2 mt-4 w-64 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-100 dark:border-slate-800 p-3"
-                >
-                  {servicesLinks.map(link => (
-                    <RouterLink 
-                      key={link.name} 
-                      to={link.href} 
-                      className="flex items-center gap-3 px-5 py-4 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-2xl transition-all hover:translate-x-1"
-                    >
-                      <span className="text-indigo-600">{link.icon}</span>
-                      {link.name}
-                    </RouterLink>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* --- RIGHT ACTIONS --- */}
-        <div className="flex items-center gap-4 z-[1001]">
-          <button 
-            onClick={() => setDark(!dark)} 
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 ${scrolled ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white/10 backdrop-blur-md border border-white/20'}`}
-          >
-            {dark ? <HiSun className="text-amber-400 text-lg" /> : <HiMoon className={`${isTransparent ? 'text-white' : 'text-slate-800'} text-lg`} />}
-          </button>
-
-          {/* User Auth Section */}
-          <div className="flex items-center">
-            {user ? (
-              <div className="relative" onMouseEnter={() => setActiveDropdown('profile')} onMouseLeave={() => setActiveDropdown(null)}>
-                <button className="relative group flex items-center gap-3 pl-2 pr-1 py-1 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-                  <div className="hidden md:block text-right">
-                    <p className={`text-[10px] font-black uppercase tracking-tighter ${isTransparent ? 'text-white/60' : 'text-slate-400'}`}>Welcome</p>
-                    <p className={`text-xs font-bold ${isTransparent ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{user.name || user.first_name}</p>
-                  </div>
-                  <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xs font-black shadow-lg group-hover:rotate-6 transition-transform">
-                    {getUserInitial()}
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-950 rounded-full" />
-                </button>
-                <ProfileDropdown 
-                  user={user}
-                  isOpen={activeDropdown === 'profile'} 
-                  onLogout={handleLogout} 
-                />
-              </div>
-            ) : (
-              <RouterLink to="/user/login" className="px-8 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 transition-all hover:-translate-y-0.5">
-                Login
-              </RouterLink>
-            )}
-          </div>
-
-          <button 
-            className={`lg:hidden w-10 h-10 flex items-center justify-center rounded-xl transition-all ${isTransparent ? 'text-white' : 'text-slate-900 dark:text-white'}`}
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? <HiX size={24} /> : <HiMenuAlt3 size={24} />}
-          </button>
-        </div>
+        </span>
       </div>
+    </RouterLink>
 
-      {/* --- MOBILE OVERLAY --- */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, x: "100%" }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: "100%" }}
-            className="fixed inset-0 bg-white dark:bg-slate-950 z-[1000] lg:hidden p-8 flex flex-col justify-center items-center text-center space-y-8"
-          >
-            {/* ... Mobile links same as before ... */}
-            <div className="space-y-6">
-               {user && (
-                  <div className="mb-6">
-                    <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center text-white text-3xl font-black mx-auto shadow-2xl mb-2">
-                       {getUserInitial()}
-                    </div>
-                    <p className="text-xl font-bold dark:text-white">{user.name || user.first_name}</p>
-                  </div>
-               )}
-              {navLinks.map((link, idx) => (
-                <motion.div key={link.name}>
-                  <RouterLink to={link.path} className="text-3xl font-black text-slate-800 dark:text-white italic">{link.name}</RouterLink>
-                </motion.div>
+    {/* Desktop Navigation */}
+    <div className="hidden lg:flex items-center gap-8">
+
+      {navLinks.map((link) => (
+        <RouterLink
+          key={link.name}
+          to={link.path}
+          className={`
+            text-sm
+            font-semibold
+            uppercase
+            tracking-[0.15em]
+            transition-all
+            duration-300
+            ${
+              location.pathname === link.path
+                ? "text-indigo-600"
+                : isTransparent
+                ? "text-white/80 hover:text-white"
+                : "text-slate-600 dark:text-slate-300 hover:text-indigo-600"
+            }
+          `}
+        >
+          {link.name}
+        </RouterLink>
+      ))}
+
+      {/* STM Club */}
+      <RouterLink
+        to="/user/stm-club"
+        className="
+          px-5
+          py-2.5
+          rounded-full
+          bg-gradient-to-r
+          from-amber-400
+          to-yellow-500
+          text-slate-900
+          text-xs
+          font-black
+          uppercase
+          tracking-widest
+          shadow-lg
+          hover:scale-105
+          transition-all
+        "
+      >
+        STM Club
+      </RouterLink>
+
+      {/* Services Dropdown */}
+      <div
+        className="relative"
+        onMouseEnter={() => setActiveDropdown("services")}
+        onMouseLeave={() => setActiveDropdown(null)}
+      >
+        <button
+          className={`
+            flex
+            items-center
+            gap-1
+            text-sm
+            font-semibold
+            uppercase
+            tracking-[0.15em]
+            ${
+              isTransparent
+                ? "text-white/80"
+                : "text-slate-600 dark:text-slate-300"
+            }
+          `}
+        >
+          Services
+          <HiChevronDown />
+        </button>
+
+        <AnimatePresence>
+          {activeDropdown === "services" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="
+                absolute
+                top-full
+                mt-4
+                w-72
+                rounded-3xl
+                bg-white
+                dark:bg-slate-900
+                shadow-2xl
+                border
+                border-slate-100
+                dark:border-slate-800
+                p-3
+              "
+            >
+              {servicesLinks.map((item) => (
+                <RouterLink
+                  key={item.name}
+                  to={item.href}
+                  className="
+                    flex
+                    items-center
+                    gap-3
+                    p-4
+                    rounded-2xl
+                    hover:bg-indigo-50
+                    dark:hover:bg-slate-800
+                    transition-all
+                  "
+                >
+                  <span className="text-indigo-600">
+                    {item.icon}
+                  </span>
+
+                  <span className="font-semibold">
+                    {item.name}
+                  </span>
+                </RouterLink>
               ))}
-            </div>
-            <button onClick={handleLogout} className="w-full py-4 bg-rose-500/10 text-rose-500 rounded-2xl font-black uppercase tracking-widest">Sign Out</button>
-          </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+
+    {/* Right Section */}
+    <div className="flex items-center gap-3">
+
+      {/* Dark Mode */}
+      <button
+        onClick={() => setDark(!dark)}
+        className="
+          w-11
+          h-11
+          rounded-2xl
+          bg-white/10
+          backdrop-blur-md
+          border
+          border-white/20
+          flex
+          items-center
+          justify-center
+          transition-all
+          hover:scale-105
+        "
+      >
+        {dark ? (
+          <HiSun className="text-amber-400 text-lg" />
+        ) : (
+          <HiMoon
+            className={`${
+              isTransparent
+                ? "text-white"
+                : "text-slate-900 dark:text-white"
+            }`}
+          />
         )}
-      </AnimatePresence>
-    </nav>
+      </button>
+
+      {/* User */}
+      {user ? (
+        <div
+          className="relative"
+          onMouseEnter={() => setActiveDropdown("profile")}
+          onMouseLeave={() => setActiveDropdown(null)}
+        >
+          <button className="flex items-center gap-3">
+
+            <div className="hidden md:block text-right">
+              <p
+                className={`text-[10px] uppercase font-bold ${
+                  isTransparent
+                    ? "text-white/60"
+                    : "text-slate-400"
+                }`}
+              >
+                Welcome
+              </p>
+
+              <p
+                className={`text-sm font-semibold ${
+                  isTransparent
+                    ? "text-white"
+                    : "text-slate-900 dark:text-white"
+                }`}
+              >
+                {user.name}
+              </p>
+            </div>
+
+            <div
+              className="
+                w-11
+                h-11
+                rounded-2xl
+                bg-gradient-to-br
+                from-indigo-600
+                to-violet-600
+                text-white
+                font-bold
+                flex
+                items-center
+                justify-center
+                shadow-lg
+              "
+            >
+              {getUserInitial()}
+            </div>
+          </button>
+
+          <ProfileDropdown
+            user={user}
+            isOpen={activeDropdown === "profile"}
+            onLogout={handleLogout}
+          />
+        </div>
+      ) : (
+        <RouterLink
+          to="/user/login"
+          className="
+            px-6
+            py-3
+            rounded-2xl
+            bg-indigo-600
+            text-white
+            font-bold
+            hover:bg-indigo-700
+            transition-all
+          "
+        >
+          Login
+        </RouterLink>
+      )}
+
+      {/* Mobile Menu */}
+      <button
+        className="
+          lg:hidden
+          w-11
+          h-11
+          rounded-2xl
+          flex
+          items-center
+          justify-center
+        "
+        onClick={() =>
+          setMobileMenuOpen(!mobileMenuOpen)
+        }
+      >
+        {mobileMenuOpen ? (
+          <HiX size={24} />
+        ) : (
+          <HiMenuAlt3 size={24} />
+        )}
+      </button>
+
+    </div>
+  </div>
+</nav>
   );
 }
 

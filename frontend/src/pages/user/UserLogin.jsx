@@ -53,17 +53,16 @@ const UserLogin = () => {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(trimmedInput)) {
                 setLoading(false);
-                return setError("Hmm, that email doesn't look quite right. (e.g., name@example.com)");
+                return setError("Hmm, that email doesn't look quite right.");
             }
-            // 🎯 Send as unified identifier
             payload.identifier = trimmedInput.toLowerCase(); 
         } else {
-            const cleanMobile = trimmedInput.replace(/\D/g, "");
+            // 🌍 THE FIX: Keep digits AND the '+' sign for international support!
+            const cleanMobile = trimmedInput.replace(/[^\d+]/g, "");
             if (cleanMobile.length < 7) {
                 setLoading(false);
-                return setError("Please enter a valid mobile number (between 7 and 15 digits).");
+                return setError("Please enter a valid mobile number.");
             }
-            // 🎯 Send as unified identifier
             payload.identifier = cleanMobile; 
         }
 
@@ -88,8 +87,14 @@ const UserLogin = () => {
     }
 
     return (
-        <div className="flex min-h-screen bg-white dark:bg-[#0a0a1a] lg:bg-[#fcfaff] lg:dark:bg-[#0a0a1a] selection:bg-purple-200 dark:selection:bg-purple-900/50 transition-colors duration-500">
+        <div className="flex min-h-screen bg-slate-50 dark:bg-[#0a0a1a] lg:bg-[#fcfaff] lg:dark:bg-[#0a0a1a] selection:bg-purple-200 dark:selection:bg-purple-900/50 transition-colors duration-500 relative">
             
+            {/* --- Mobile Only Header --- */}
+            <div className="lg:hidden absolute top-0 left-0 right-0 h-48 bg-purple-900 rounded-b-[40px] z-0 overflow-hidden">
+                <div className="absolute inset-0 bg-[url('/assets/event-banner.png')] bg-cover bg-center opacity-20"></div>
+                <div className="absolute inset-0 bg-gradient-to-b from-purple-950/80 to-transparent"></div>
+            </div>
+
             <div className="hidden lg:flex lg:w-[50%] xl:w-[55%] relative overflow-hidden bg-purple-950">
                 <img src="/assets/event-banner.png" alt="Branding Banner" className="absolute inset-0 w-full h-full object-cover opacity-50 scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-purple-950 via-transparent to-purple-900/40" />
@@ -101,9 +106,18 @@ const UserLogin = () => {
                 </div>
             </div>
 
-            <div className="w-full lg:w-[50%] xl:w-[45%] flex flex-col justify-center items-center p-6 sm:p-12 md:p-20 relative bg-white dark:bg-[#0a0a1a] transition-colors duration-500">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-md">
-                    <div className="mb-8">
+            <div className="w-full lg:w-[50%] xl:w-[45%] flex flex-col justify-center items-center p-6 sm:p-12 md:p-20 relative z-10">
+                
+                {/* Mobile Back Button */}
+                <div className="w-full max-w-md mb-6 lg:hidden flex items-center justify-between text-white">
+                    <Link to="/" className="flex items-center gap-2 text-sm font-medium opacity-80 hover:opacity-100">
+                        <FiChevronLeft size={20} /> Back
+                    </Link>
+                    <span className="font-serif font-bold text-lg">STM Club</span>
+                </div>
+
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-md bg-white p-8 rounded-[2rem] shadow-xl shadow-slate-200/50 lg:bg-transparent lg:shadow-none lg:p-0 dark:bg-[#111122] lg:dark:bg-transparent">
+                    <div className="hidden lg:block mb-8">
                         <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-400 dark:text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 transition-all group">
                             <FiChevronLeft className="group-hover:-translate-x-1 transition-transform" /> Back to Home
                         </Link>
@@ -111,7 +125,7 @@ const UserLogin = () => {
 
                     <div className="mb-10 text-center lg:text-left">
                         <h1 className="text-3xl sm:text-4xl font-serif text-slate-900 dark:text-white mb-3">Sign In</h1>
-                        <p className="text-slate-500 dark:text-slate-400 font-medium">Welcome back! Please enter your details.</p>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium text-sm sm:text-base">Welcome back! Please enter your details.</p>
                     </div>
 
                     <AnimatePresence mode="wait">
@@ -131,14 +145,15 @@ const UserLogin = () => {
 
                     <form onSubmit={handleLogin} className="space-y-5">
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Email or Mobile Number</label>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Email / Mobile</label>
                             <div className="relative group">
                                 <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-purple-600 dark:group-focus-within:text-purple-400" />
                                 <input 
                                     type="text" 
-                                    placeholder="Enter registered email or phone" 
+                                    /* 🌍 THE FIX: Better Placeholder */
+                                    placeholder="Include + code if outside India" 
                                     value={inputValue} 
-                                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl focus:border-purple-500 dark:focus:border-purple-500 outline-none font-medium text-slate-900 dark:text-white transition-all focus:bg-white dark:focus:bg-slate-900" 
+                                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl focus:border-purple-500 dark:focus:border-purple-500 outline-none font-medium text-slate-900 dark:text-white transition-all focus:bg-white dark:focus:bg-slate-900 text-sm sm:text-base" 
                                     onChange={(e) => setInputValue(e.target.value)} 
                                     required 
                                 />
@@ -156,7 +171,7 @@ const UserLogin = () => {
                                     type={showPassword ? "text" : "password"} 
                                     placeholder="••••••••" 
                                     value={password}
-                                    className="w-full pl-12 pr-12 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl focus:border-purple-500 dark:focus:border-purple-500 outline-none font-medium text-slate-900 dark:text-white transition-all focus:bg-white dark:focus:bg-slate-900 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden" 
+                                    className="w-full pl-11 pr-12 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl focus:border-purple-500 dark:focus:border-purple-500 outline-none font-medium text-slate-900 dark:text-white transition-all focus:bg-white dark:focus:bg-slate-900 text-sm sm:text-base [&::-ms-reveal]:hidden [&::-ms-clear]:hidden" 
                                     onChange={(e) => setPassword(e.target.value)} 
                                     required 
                                 />
@@ -166,13 +181,13 @@ const UserLogin = () => {
                             </div>
                         </div>
 
-                        <button type="submit" disabled={loading} className="w-full py-4 bg-purple-700 hover:bg-purple-800 text-white rounded-2xl font-bold shadow-lg shadow-purple-200 dark:shadow-none transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed">
+                        <button type="submit" disabled={loading} className="w-full mt-2 py-4 bg-purple-700 hover:bg-purple-800 text-white rounded-2xl font-bold shadow-lg shadow-purple-200 dark:shadow-none transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed">
                             {loading ? <Loader2 className="animate-spin" size={20} /> : <><span>Sign In</span> <FiArrowRight /></>}
                         </button>
                     </form>
 
-                    <div className="mt-10 text-center">
-                        <p className="text-slate-500 dark:text-slate-400 font-medium">New to our community? <Link to="/signup" className="ml-2 text-purple-600 dark:text-purple-400 font-bold hover:underline">Create an account</Link></p>
+                    <div className="mt-8 sm:mt-10 text-center border-t border-slate-100 dark:border-slate-800/50 pt-6">
+                        <p className="text-slate-500 dark:text-slate-400 font-medium text-sm sm:text-base">New to our community? <Link to="/signup" className="ml-1 text-purple-600 dark:text-purple-400 font-bold hover:underline">Create an account</Link></p>
                     </div>
                 </motion.div>
             </div>

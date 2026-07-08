@@ -143,12 +143,22 @@ exports.verifyOtp = async (req, res) => {
         const user = await User.findOne({ mobile_number: cleanMobile });
         if (!user) return res.status(404).json({ success: false, message: "User not found." });
 
-        // 1. Try Twilio/QA Magic Key via NotificationHub
-        let isOtpValid = await NotificationHub.verifyMobileToken(cleanMobile, otp);
+        let isOtpValid = false;
+
+        // 📡 1. Try Twilio/QA Magic Key via NotificationHub
+        try {
+            isOtpValid = await NotificationHub.verifyMobileToken(cleanMobile, otp);
+        } catch (twilioError) {
+            // ✨ SILENT CATCH: Prevents 500 crashes on Twilio Trial errors
+            console.log(`⚠️ [Web Twilio Bypass]: Twilio rejected request (${twilioError.message}). Falling back to DB...`);
+        }
         
-        // 2. Fallback to Local Database Check
-        if (!isOtpValid && user.otp === otp && new Date() <= user.otp_expires) {
-            isOtpValid = true;
+        // 💾 2. Fallback to Local Database Check
+        if (!isOtpValid) {
+            if (user.otp === otp && new Date() <= user.otp_expires) {
+                isOtpValid = true;
+                console.log("✅ [Web OTP Verified]: Successfully matched internal Database OTP.");
+            }
         }
 
         if (!isOtpValid) return res.status(400).json({ success: false, message: "Invalid or expired OTP." });
@@ -164,11 +174,10 @@ exports.verifyOtp = async (req, res) => {
         
         return res.status(200).json({ success: true, message: "Verification successful.", user: serializeUser(user, 'web') });
     } catch (error) { 
-        console.error("Web Verify OTP Error:", error);
+        console.error("🔥 Web Verify OTP Error:", error);
         return res.status(500).json({ success: false, message: "Server error during verification." }); 
     }
 };
-
 // ==========================================
 // 4. SESSION MANAGEMENT
 // ==========================================

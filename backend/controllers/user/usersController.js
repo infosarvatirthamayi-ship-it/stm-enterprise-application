@@ -6,7 +6,7 @@ const { getFullImageUrl } = require("../../utils/config");
 // 🎯 THE FIX: Pointing to the new Notification Hub!
 const NotificationHub = require("../../utils/NotificationHub"); 
 // 🎯 THE FIX: Only pulling what we need from the Shared Service
-const { serializeUser, normalizeMobile } = require("../shared/authService");
+const { normalizeMobile } = require("../shared/authService");
 // --- 🧠 CORE SHARED SERIALIZER ---
 const serializeUser = (user) => {
   if (!user) return null;
@@ -47,6 +47,8 @@ exports.signupUser = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
+    console.log(`🪄 MAGICAL OTP FOR ${cleanMobile}:`, otp);
+    
     if (user) {
       user.first_name = first_name; user.password = password; user.otp = otp; user.otp_expires = otpExpires;
     } else {
@@ -62,30 +64,62 @@ exports.signupUser = async (req, res) => {
 exports.verifyOtp = async (req, res) => {
   try {
     const { mobile_number, otp, user_id } = req.body;
-    let query = { otp, _id: user_id };
+    const cleanOtp = String(otp || "").trim();
+    
+    // 🔍 1. Find User (Without forcing OTP match yet)
+    let query = { _id: user_id };
 
     if (mobile_number) {
         const cleanMobile = String(mobile_number).replace(/[^\d+]/g, "");
         const rawDigits = cleanMobile.replace('+', '');
         query = { 
             $or: [
-                { mobile_number: cleanMobile, otp }, 
-                { mobile_number: `+${rawDigits}`, otp }, 
-                { mobile_number: rawDigits, otp },
-                { mobile_number: rawDigits.slice(-10), otp },
-                { _id: user_id, otp }
+                { mobile_number: cleanMobile }, 
+                { mobile_number: `+${rawDigits}` }, 
+                { mobile_number: rawDigits },
+                { mobile_number: rawDigits.slice(-10) },
+                { _id: user_id }
             ] 
         };
     }
     
     const user = await User.findOne(query);
-    if (!user || new Date() > user.otp_expires) return res.status(400).json({ status: "false", message: "Invalid/Expired OTP." });
+    if (!user) return res.status(404).json({ status: "false", message: "User account not found." });
 
-    user.is_verified = true; user.otp = null;
+    let isOtpValid = false;
+
+    // 📡 2. Try Twilio/QA Magic Key via NotificationHub
+    if (user.mobile_number) {
+        try {
+            isOtpValid = await NotificationHub.verifyMobileToken(user.mobile_number, cleanOtp);
+        } catch (twilioError) {
+             // ✨ SILENT CATCH
+            console.log(`⚠️ [Mobile Twilio Bypass]: Twilio rejected request (${twilioError.message}). Falling back to DB...`);
+        }
+    }
+
+    // 💾 3. Fallback to Local Database Check
+    if (!isOtpValid) {
+        if (user.otp === cleanOtp && new Date() <= user.otp_expires) {
+            isOtpValid = true;
+            console.log("✅ [Mobile OTP Verified]: Successfully matched internal Database OTP.");
+        }
+    }
+
+    if (!isOtpValid) return res.status(400).json({ status: "false", message: "Invalid or Expired OTP." });
+
+    // ✅ 4. Success!
+    user.is_verified = true; 
+    user.otp = null;
     await user.save();
+    
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "30d" });
     return res.status(200).json({ status: "true", token, data: serializeUser(user) });
-  } catch (error) { return res.status(500).json({ status: "false", message: error.message }); }
+    
+  } catch (error) { 
+      console.error("🔥 Mobile Verify OTP Error:", error);
+      return res.status(500).json({ status: "false", message: error.message }); 
+  }
 };
 
 exports.resendOtp = async (req, res) => {

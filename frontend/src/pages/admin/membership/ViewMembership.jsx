@@ -1,150 +1,121 @@
+// src/pages/admin/membership/ViewMembership.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "../../../api/api";
 import { FaChevronRight, FaSpinner } from "react-icons/fa";
+import { useAdminAuth } from "../../../context/AdminAuthContext";
 
 export default function ViewMembership() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { dark } = useAdminAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.get(`/admin/memberships/${id}`)
-      .then((res) => {
-        setData(res.data.data || res.data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error fetching membership:", err);
-        setLoading(false);
-      });
+      .then((res) => { setData(res.data?.data || res.data); setLoading(false); })
+      .catch((err) => { console.error(err); setLoading(false); });
   }, [id]);
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#f8fafc]">
-      <FaSpinner className="animate-spin text-indigo-600 text-3xl mb-4" />
-      <p className="text-slate-400 italic">Retrieving Membership Details...</p>
+    <div className={`flex flex-col items-center justify-center min-h-[60vh] gap-4 ${dark ? 'text-slate-200' : 'text-slate-800'}`}>
+      <div className="animate-spin h-10 w-10 rounded-full border-4 border-indigo-600/20 border-t-indigo-600" />
+      <p className="text-xs font-black uppercase tracking-widest animate-pulse text-indigo-500">Retrieving Specifications...</p>
     </div>
   );
 
   if (!data) return (
-    <div className="p-10 text-center">
-      <p className="text-red-500 font-bold">Membership not found.</p>
-      <Link to="/admin/membership-card" className="mt-4 text-indigo-600 underline block">Go Back</Link>
+    <div className="p-20 text-center">
+      <p className="text-rose-500 font-black text-xl mb-4">Membership Matrix Not Found.</p>
+      <Link to="/admin/membership-card" className="text-indigo-500 font-bold hover:underline">Return to Ledger</Link>
     </div>
   );
 
-  const labelClass = "text-[10px] font-bold text-[#94a3b8] uppercase tracking-wider mb-1 block";
-  const valueClass = "text-[14px] font-medium text-[#475569] block";
+  const labelClass = "text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block";
+  const valueClass = `text-lg font-bold ${dark ? 'text-white' : 'text-slate-800'} block`;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-4 md:p-8 font-sans">
-      <div className="max-w-6xl mx-auto">
-        
-        {/* Breadcrumbs matching Screenshot 7 */}
-        <nav className="flex items-center gap-2 text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-6">
-          <Link to="/admin/membership-card" className="hover:text-indigo-600 transition-colors">
-            Membership Cards
-          </Link>
-          <FaChevronRight size={8} />
-          <span className="text-slate-600">View</span>
+    <div className={`min-h-screen p-4 md:p-8 font-sans transition-colors ${dark ? 'bg-[#0a0a1a]' : 'bg-[#f8fafc]'}`}>
+      <div className="max-w-5xl mx-auto">
+        <nav className="flex items-center gap-2 text-slate-500 text-[10px] font-black uppercase tracking-widest mb-8">
+          <Link to="/admin/membership-card" className="hover:text-indigo-500">Membership Cards</Link>
+          <FaChevronRight size={8} /> <span className={dark ? 'text-slate-300' : 'text-slate-700'}>View Matrix</span>
         </nav>
 
-        {/* Main Card Container */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-50">
-            <h2 className="text-[18px] font-semibold text-[#475569]">Membership Card Details</h2>
+        <div className={`rounded-[2.5rem] shadow-2xl border overflow-hidden ${dark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+          <div className={`p-8 border-b ${dark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'}`}>
+            <h2 className={`text-2xl font-black font-serif ${dark ? 'text-white' : 'text-slate-800'}`}>Plan Specifications</h2>
           </div>
 
-          <div className="p-6 md:p-10">
-            {/* Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-8 gap-x-12 mb-10">
+          <div className="p-8 md:p-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-12 mb-12">
               
-              {/* Card Name */}
               <div>
                 <label className={labelClass}>Card Name</label>
                 <span className={valueClass}>{data.name}</span>
               </div>
 
-              {/* Status Badge matches Screenshot 7 */}
               <div>
-                <label className={labelClass}>Status</label>
-                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase mt-1 ${data.status === 1 ? 'bg-[#22c55e]' : 'bg-red-500'}`}>
+                <label className={labelClass}>Operational Status</label>
+                <span className={`inline-block px-3 py-1 mt-1 rounded-lg text-[10px] font-black tracking-widest uppercase border ${data.status === 1 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'}`}>
                   {data.status === 1 ? 'Active' : 'Inactive'}
                 </span>
               </div>
 
-              {/* Duration Type */}
-              <div>
-                <label className={labelClass}>Duration Type</label>
-                <span className={valueClass}>{data.duration_type === 1 ? 'Months' : 'Years'}</span>
+              <div className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5">
+                <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 block">Listed Price</label>
+                <span className="text-2xl font-black text-emerald-500">₹{data.price?.toLocaleString()}</span>
               </div>
 
-              {/* Duration */}
+              <div className="p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5">
+                <label className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-1 block">Darshan Discount</label>
+                <span className="text-2xl font-black text-indigo-500">{data.discount_percentage || 0}% OFF</span>
+              </div>
+
               <div>
                 <label className={labelClass}>Duration</label>
-                <span className={valueClass}>{data.duration}</span>
+                <span className={valueClass}>{data.duration} {data.duration_type === 1 ? 'Months' : 'Years'}</span>
               </div>
 
-              {/* Visits */}
               <div>
-                <label className={labelClass}>Visits</label>
-                <span className={valueClass}>{data.visits || 0}</span>
+                <label className={labelClass}>Total Visits Allowed</label>
+                <span className={valueClass}>{data.visits || data.total_visits || 0}</span>
               </div>
 
-              {/* Price */}
-              <div>
-                <label className={labelClass}>Price</label>
-                <span className={valueClass}>{data.price?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-              </div>
-
-              {/* Description */}
               <div className="md:col-span-2">
-                <label className={labelClass}>Description</label>
-                <span className={`${valueClass} text-slate-500 italic`}>
-                  {data.description || "N/A"}
-                </span>
+                <label className={labelClass}>Description / Benefits</label>
+                <span className={`text-sm font-medium italic ${dark ? 'text-slate-400' : 'text-slate-600'}`}>{data.description || "N/A"}</span>
               </div>
             </div>
 
-            {/* Temples List Section matching Screenshot 7 */}
-            <div className="mb-10">
-              <label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-4 block">
-                Temples and Maximum Visits
-              </label>
+            <div className="mb-12">
+              <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4 block">Designated Sanctuaries</label>
               
-              <div className="border border-slate-100 rounded-lg overflow-hidden">
+              <div className={`border rounded-2xl overflow-hidden ${dark ? 'border-slate-800' : 'border-slate-200'}`}>
                 {data.temples?.length > 0 ? data.temples.map((t, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
-                    <span className="text-[13px] text-[#64748b]">
-                      {t.templeId?.name || t.name || "Unknown Temple"}
+                  <div key={idx} className={`flex justify-between items-center p-5 border-b last:border-0 transition-colors ${dark ? 'border-slate-800 hover:bg-slate-800/50' : 'border-slate-100 hover:bg-slate-50'}`}>
+                    <span className={`text-sm font-bold ${dark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {t.templeId?.name || t.temple_name || t.name || "Unknown Temple"}
                     </span>
-                    <span className="bg-[#818cf8] text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">
+                    <span className="bg-indigo-500 text-white text-[10px] font-black tracking-widest px-4 py-1.5 rounded-xl uppercase shadow-lg shadow-indigo-500/20">
                       {t.maxVisits || t.max_visits || 0} Visits
                     </span>
                   </div>
                 )) : (
-                  <div className="p-4 text-center text-slate-400 text-sm italic">
-                    No specific temples assigned.
+                  <div className={`p-6 text-center text-sm font-bold italic ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    No specific temples mapped. Subject to Global Visit Limit.
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Actions Footer matching Screenshot 7 */}
-            <div className="flex justify-end gap-3 pt-6">
-              <button 
-                onClick={() => navigate(`/admin/membership/edit/${id}`)}
-                className="bg-[#f59e0b] hover:bg-amber-500 text-white px-8 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all"
-              >
-                Edit
+            <div className={`flex justify-end gap-4 pt-8 border-t ${dark ? 'border-slate-800' : 'border-slate-100'}`}>
+              <button onClick={() => navigate("/admin/membership-card")} className="px-8 py-4 font-bold text-slate-500 hover:text-slate-400 transition-colors">
+                Back to Ledger
               </button>
-              <button 
-                onClick={() => navigate("/admin/membership-card")}
-                className="bg-[#94a3b8] hover:bg-slate-500 text-white px-8 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all"
-              >
-                Back
+              <button onClick={() => navigate(`/admin/membership/edit/${id}`)} className="bg-amber-500 hover:bg-amber-400 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/20 transition-all active:scale-95">
+                Edit Specifications
               </button>
             </div>
           </div>

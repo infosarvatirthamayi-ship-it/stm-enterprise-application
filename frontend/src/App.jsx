@@ -1,161 +1,79 @@
 import React from "react";
-
-import {
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-} from "react-router-dom";
-
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
-/*
-|--------------------------------------------------------------------------
-| Global Components
-|--------------------------------------------------------------------------
-*/
+// Context Providers
+import { UserAuthProvider } from "./context/UserAuthContext";
+import { AdminAuthProvider } from "./context/AdminAuthContext";
+import { TempleAdminAuthProvider } from "./context/TempleAdminAuthContext"; 
+
+// Global Components
 import Navbar from "./components/Navbar";
-import ProtectedRoute from "./components/ProtectedRoute";
 
-/*
-|--------------------------------------------------------------------------
-| User Routes
-|--------------------------------------------------------------------------
-*/
+// Layered System Routes
 import { UserRoutes } from "./routes/UserRoutes";
-
-/*
-|--------------------------------------------------------------------------
-| Admin Routes
-|--------------------------------------------------------------------------
-*/
 import { AdminRoutes } from "./routes/AdminRoutes";
+import { TempleAdminRoutes } from "./routes/TempleAdminRoutes"; // 🎯 Imported the modular temple route tree!
 
-/*
-|--------------------------------------------------------------------------
-| Admin Authentication
-|--------------------------------------------------------------------------
-*/
+// Authentication Panel Points
 import AdminLogin from "./pages/admin/AdminLogin";
 import ForgotPassword from "./pages/admin/ForgotPassword";
 import ResetPassword from "./pages/admin/ResetPassword";
-
-/*
-|--------------------------------------------------------------------------
-| Temple Admin
-|--------------------------------------------------------------------------
-*/
-import TempleAdminDashboard from "./pages/temple-admin/TempleAdminDashboard";
+import TempleAdminLogin from "./pages/temple-admin/TempleAdminLogin"; 
 
 export default function App() {
-
   const location = useLocation();
 
-  /*
-  |--------------------------------------------------------------------------
-  | HIDE NAVBAR CONDITIONS
-  |--------------------------------------------------------------------------
-  */
   const authPaths = [
     "/user/login",
     "/signup",
     "/verify-otp",
-    "/forgot-password",
+    "/user/forgot-password",
     "/admin/login",
     "/temple-admin/login",
   ];
 
-  const isAdminArea =
-    location.pathname.startsWith("/admin") ||
-    location.pathname.startsWith("/temple-admin");
-
-  const showNavbar =
-    !authPaths.includes(location.pathname) &&
-    !isAdminArea;
+  const isAdminArea = location.pathname.startsWith("/admin") || location.pathname.startsWith("/temple-admin");
+  const showNavbar = !authPaths.includes(location.pathname) && !isAdminArea;
 
   return (
-    <>
-      {/* Toast Notifications */}
-      <Toaster
-        position="top-right"
-        reverseOrder={false}
-      />
+    <UserAuthProvider>
+      <AdminAuthProvider>
+        <TempleAdminAuthProvider>
+          
+          <Toaster position="top-right" reverseOrder={false} />
+          {showNavbar && <Navbar />}
 
-      {/* Navbar */}
-      {showNavbar && <Navbar />}
+          <Routes>
+            {/* ==========================================
+                🙏 USER ZONE
+                ========================================== */}
+            <Route path="/*" element={<UserRoutes />} />
 
-      {/* Routes */}
-      <Routes>
+            {/* ==========================================
+                🛡️ CORE SYSTEM ADMIN ZONE
+                ========================================== */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/forgot-password" element={<ForgotPassword />} />
+            <Route path="/admin/reset-password/:token" element={<ResetPassword />} />
+            
+            {/* Mount core dashboard and office systems */}
+            {AdminRoutes}
 
-        {/* User Routes */}
-        {UserRoutes}
+            {/* ==========================================
+                🛕 TEMPLE AUTHORITY OPERATIONAL ZONE
+                ========================================== */}
+            <Route path="/temple-admin/login" element={<TempleAdminLogin />} />
+            
+            {/* 🎯 Un-noted & mounted cleanly: Diverting all operations to the new route tree */}
+            {TempleAdminRoutes}
 
-        {/* Admin Auth */}
-        <Route
-          path="/admin/login"
-          element={<AdminLogin />}
-        />
-
-        <Route
-          path="/temple-admin/login"
-          element={<AdminLogin />}
-        />
-
-        <Route
-          path="/admin/forgot-password"
-          element={<ForgotPassword />}
-        />
-
-        <Route
-          path="/admin/reset-password/:token"
-          element={<ResetPassword />}
-        />
-
-        {/* Admin Routes */}
-        {AdminRoutes}
-
-        {/* Temple Admin */}
-        <Route
-          path="/temple-admin"
-          element={
-            <ProtectedRoute allowedTypes={[2]}>
-              <TempleAdminDashboard />
-            </ProtectedRoute>
-          }
-        >
-          <Route
-            index
-            element={
-              <Navigate
-                to="dashboard"
-                replace
-              />
-            }
-          />
-
-          <Route
-            path="dashboard"
-            element={
-              <div className="p-4">
-                Welcome to Temple Dashboard
-              </div>
-            }
-          />
-        </Route>
-
-        {/* Fallback */}
-        <Route
-          path="*"
-          element={
-            <Navigate
-              to="/"
-              replace
-            />
-          }
-        />
-
-      </Routes>
-    </>
+            {/* Global Unknown Fallback Security Catch */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          
+        </TempleAdminAuthProvider>
+      </AdminAuthProvider>
+    </UserAuthProvider>
   );
 }
-

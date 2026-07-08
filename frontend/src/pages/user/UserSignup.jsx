@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FiUser, FiPhone, FiMail, FiLock, FiCheckCircle, FiArrowLeft, FiArrowRight, FiEye, FiEyeOff, FiChevronLeft } from "react-icons/fi";
 import { Loader2 } from "lucide-react";
 import api from "../../api/api";
-import { useAuth } from "../../context/AuthContext";
+import { useUserAuth } from "../../context/UserAuthContext.jsx"; // 🎯 THE FIX: Imported isolated context hook
 
 export default function UserSignup() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  
+  // 🎯 THE FIX: Destructure from useUserAuth instead of useAuth
+  const { user, loading: authLoading } = useUserAuth();
   
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); 
@@ -20,7 +22,7 @@ export default function UserSignup() {
 
   const [formData, setFormData] = useState({
     first_name: "",
-    last_name: "", // Added explicitly
+    last_name: "", 
     email: "",
     mobile_number: "",
     password: "",
@@ -40,7 +42,6 @@ export default function UserSignup() {
       interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
     } else if (timer === 0) {
       setCanResend(true);
-      clearInterval(interval);
     }
     return () => clearInterval(interval);
   }, [step, timer]);
@@ -57,7 +58,6 @@ export default function UserSignup() {
 
     setLoading(true);
     try {
-      // Sending data to Backend (Matching userController.js keys)
       const { data } = await api.post("/user/signup", {
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
@@ -72,7 +72,6 @@ export default function UserSignup() {
         setCanResend(false);
       }
     } catch (err) {
-      // Map 400/500 errors to user-friendly messages
       setError(err.response?.data?.message || "Signup failed. Please try again.");
     } finally {
       setLoading(false);
@@ -82,10 +81,9 @@ export default function UserSignup() {
   // --- STEP 2: Handle OTP Verification ---
   const handleVerifyOtp = async (e) => {
     if (e) e.preventDefault();
-    if (formData.otp.length !== 6)
-      { 
-        return setError("Enter the 6-digit verification code.");
-      }
+    if (formData.otp.length !== 6) { 
+      return setError("Enter the 6-digit verification code.");
+    }
     setError("");
     setLoading(true);
     try {
@@ -96,9 +94,8 @@ export default function UserSignup() {
 
       if (data.success) {
         setIsSuccess(true);
-        // Short delay to show the success animation
         setTimeout(() => {
-          navigate("/login", { 
+          navigate("/user/login", { 
             state: { 
               mobile: formData.mobile_number, 
               message: "Verification successful! Please log in." 
@@ -166,10 +163,10 @@ export default function UserSignup() {
         
         {/* Navigation Link: Back to Home */}
         <div className="absolute top-8 left-8 z-20">
-              <Link to="/" className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-purple-600 transition-all group">
-                <FiChevronLeft className="group-hover:-translate-x-1 transition-transform" />
-                Back to Home
-              </Link>
+             <Link to="/" className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-purple-600 transition-all group">
+               <FiChevronLeft className="group-hover:-translate-x-1 transition-transform" />
+               Back to Home
+             </Link>
         </div>
 
         <div className="w-full max-w-md">
@@ -227,7 +224,7 @@ export default function UserSignup() {
                     <div className="relative group">
                         <input type={showPassword ? "text" : "password"} placeholder="Confirm" required className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-purple-500 focus:bg-white transition-all" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                             {showPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                           {showPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
                         </button>
                     </div>
                   </div>
@@ -283,7 +280,9 @@ export default function UserSignup() {
           </AnimatePresence>
 
           <div className="mt-12 pt-8 border-t border-slate-100 text-center">
-            <p className="text-slate-500 font-medium">Already a member? <Link to="/login" className="text-purple-600 font-bold hover:underline ml-1">Sign In</Link></p>
+            <p className="text-slate-500 font-medium">
+              Already a member? <Link to="/user/login" className="text-purple-600 font-bold hover:underline ml-1">Sign In</Link>
+            </p>
           </div>
         </div>
       </div>

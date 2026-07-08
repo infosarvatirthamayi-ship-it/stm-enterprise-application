@@ -1,307 +1,75 @@
+// src/pages/admin/Dashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
-
-import {
-  NavLink,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-
-import { useAuth } from "../../context/AuthContext";
-
-import {
-  Home,
-  Users,
-  ChevronDown,
-  Building,
-  Menu,
-  ScrollText,
-  Calendar,
-  CreditCard,
-  User,
-  LogOut,
-  Ticket,
-  Gift,
-  X,
-  ShieldCheck,
-} from "lucide-react";
-
-/*
-|--------------------------------------------------------------------------
-| Sidebar Menu Configuration
-|--------------------------------------------------------------------------
-*/
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useAdminAuth } from "../../context/AdminAuthContext";
+import { Home, Users, ChevronDown, Building, Menu, ScrollText, Calendar, CreditCard, User, LogOut, Ticket, Gift, X, ShieldCheck, MapPin } from "lucide-react";
+// (Keep your sidebarMenus array exactly as is above this line)
 const sidebarMenus = [
-  {
-    type: "link",
-    label: "Dashboard",
-    icon: Home,
-    to: "/admin/dashboard",
-  },
-
-  {
-    type: "link",
-    label: "Devotees",
-    icon: Users,
-    to: "/admin/user/list",
-  },
-
-  {
-    type: "dropdown",
-    label: "Temple",
-    icon: Building,
-    items: [
-      {
-        label: "Temple List",
-        to: "/admin/temple",
-      },
-      {
-        label: "Bookings",
-        to: "/admin/temple-booking",
-      },
-    ],
-  },
-
-  {
-    type: "dropdown",
-    label: "Ritual",
-    icon: ScrollText,
-    items: [
-      {
-        label: "Ritual List",
-        to: "/admin/ritual",
-      },
-      {
-        label: "Packages",
-        to: "/admin/ritual/package",
-      },
-      {
-        label: "Bookings",
-        to: "/admin/ritual-booking",
-      },
-    ],
-  },
-
-  {
-    type: "dropdown",
-    label: "Membership",
-    icon: CreditCard,
-    items: [
-      {
-        label: "Plans",
-        to: "/admin/membership-card",
-      },
-      {
-        label: "Subscriptions",
-        to: "/admin/purchased-member-card",
-      },
-    ],
-  },
-
-  {
-    type: "dropdown",
-    label: "Offers & Vouchers",
-    icon: Gift,
-    items: [
-      {
-        label: "Offers",
-        to: "/admin/offers",
-      },
-      {
-        label: "Vouchers",
-        to: "/admin/voucher",
-      },
-    ],
-  },
-
-  {
-    type: "dropdown",
-    label: "Events",
-    icon: Calendar,
-    items: [
-      {
-        label: "Event List",
-        to: "/admin/event",
-      },
-      {
-        label: "Bookings",
-        to: "/admin/event-booking",
-      },
-    ],
-  },
-
-  {
-    type: "link",
-    label: "My Profile",
-    icon: User,
-    to: "/admin/profile",
-  },
+  { type: "link", label: "Dashboard", icon: Home, to: "/admin/dashboard" },
+  { type: "link", label: "Devotees", icon: Users, to: "/admin/user/list" },
+  { type: "dropdown", label: "Temple", icon: Building, items: [{ label: "Temple List", to: "/admin/temple" }, { label: "Bookings", to: "/admin/temple-booking" }] },
+  { type: "dropdown", label: "Ritual", icon: ScrollText, items: [{ label: "Ritual List", to: "/admin/ritual" }, { label: "Packages", to: "/admin/ritual/package" }, { label: "Bookings", to: "/admin/ritual-booking" }] },
+  { type: "dropdown", label: "Membership", icon: CreditCard, items: [{ label: "Plans", to: "/admin/membership-card" }, { label: "Subscriptions", to: "/admin/purchased-member-card" }] },
+  { type: "dropdown", label: "Offers & Vouchers", icon: Gift, items: [{ label: "Offers", to: "/admin/offers" }, { label: "Vouchers", to: "/admin/voucher" }] },
+  { type: "dropdown", label: "Events", icon: Calendar, items: [{ label: "Event List", to: "/admin/event" }, { label: "Bookings", to: "/admin/event-booking" }] },
+  { type: "link", label: "Locations", icon: MapPin, to: "/admin/locations" },
+  { type: "link", label: "My Profile", icon: User, to: "/admin/profile" },
 ];
 
 export default function Dashboard() {
-
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout, dark } = useAdminAuth();
 
-  const { logout } = useAuth();
-
-  /*
-  |--------------------------------------------------------------------------
-  | SIDEBAR STATE
-  |--------------------------------------------------------------------------
-  */
-  const [collapsed, setCollapsed] = useState(() => {
-    return localStorage.getItem("admin_sidebar_collapsed") === "true";
-  });
-
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("admin_sidebar_collapsed") === "true");
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  /*
-  |--------------------------------------------------------------------------
-  | SAVE SIDEBAR STATE
-  |--------------------------------------------------------------------------
-  */
-  useEffect(() => {
-    localStorage.setItem(
-      "admin_sidebar_collapsed",
-      collapsed
-    );
-  }, [collapsed]);
+  useEffect(() => { localStorage.setItem("admin_sidebar_collapsed", collapsed); }, [collapsed]);
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | AUTO CLOSE MOBILE SIDEBAR
-  |--------------------------------------------------------------------------
-  */
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | LOGOUT
-  |--------------------------------------------------------------------------
-  */
   const handleLogout = () => {
-
     logout();
-
-    navigate("/admin/login", {
-      replace: true,
-    });
+    navigate("/admin/login", { replace: true });
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex">
-
+    <div className={`h-screen w-full flex overflow-hidden ${dark ? 'bg-[#0a0a1a] text-slate-200' : 'bg-slate-50 text-slate-900'}`}>
+      
       {/* Mobile Header */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4">
-
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-16 bg-slate-950 border-b border-slate-800 flex items-center justify-between px-4 shadow-xl">
         <div className="flex items-center gap-2">
-          <ShieldCheck
-            size={18}
-            className="text-indigo-400"
-          />
-
-          <span className="text-white font-black tracking-wider text-xs">
-            SARVATIRTHAMAYI
-          </span>
+          <div className="p-1.5 bg-indigo-500/20 rounded-lg"><ShieldCheck size={18} className="text-indigo-400" /></div>
+          <span className="text-white font-black tracking-widest text-[10px] uppercase">Command Center</span>
         </div>
-
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="text-slate-300 hover:text-white"
-        >
-          <Menu size={22} />
-        </button>
-
+        <button onClick={() => setMobileOpen(true)} className="p-2 bg-slate-900 rounded-lg text-slate-300 hover:text-white border border-slate-800"><Menu size={20} /></button>
       </header>
 
       {/* Desktop Sidebar */}
-      <aside
-        className={`
-          hidden md:flex flex-col
-          bg-slate-900 border-r border-slate-800
-          sticky top-0 h-screen
-          transition-all duration-300
-          ${collapsed ? "w-20" : "w-72"}
-        `}
-      >
-
-        <SidebarHeader
-          collapsed={collapsed}
-          onToggle={() => setCollapsed(!collapsed)}
-        />
-
-        <SidebarMenus
-          collapsed={collapsed}
-          menus={sidebarMenus}
-          onLogout={handleLogout}
-        />
-
+      <aside className={`hidden md:flex flex-col bg-slate-950 border-r border-slate-800 relative z-20 transition-all duration-300 ease-in-out ${collapsed ? "w-20" : "w-72"}`}>
+        <SidebarHeader collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+        <SidebarMenus collapsed={collapsed} menus={sidebarMenus} onLogout={handleLogout} />
       </aside>
 
       {/* Mobile Sidebar */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setMobileOpen(false)}
-          />
-
-          {/* Sidebar */}
-          <aside className="relative z-50 w-72 h-full bg-slate-900 border-r border-slate-800 animate-in slide-in-from-left duration-300">
-
-            <div className="h-14 flex items-center justify-between px-4 border-b border-slate-800">
-
-              <div className="flex items-center gap-2">
-                <ShieldCheck
-                  size={18}
-                  className="text-indigo-400"
-                />
-
-                <span className="text-white font-black text-xs tracking-widest">
-                  ADMIN PANEL
-                </span>
-              </div>
-
-              <button
-                onClick={() => setMobileOpen(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X size={20} />
-              </button>
-
+        <div className="fixed inset-0 z-[100] md:hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="relative w-72 h-full bg-slate-950 border-r border-slate-800 shadow-2xl flex flex-col transform transition-transform duration-300 translate-x-0">
+            <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
+              <span className="text-white font-black text-[10px] tracking-widest uppercase">Admin Panel</span>
+              <button onClick={() => setMobileOpen(false)} className="p-2 rounded-lg bg-slate-900 text-slate-400 hover:text-white border border-slate-800"><X size={18} /></button>
             </div>
-
-            <SidebarMenus
-              collapsed={false}
-              menus={sidebarMenus}
-              onLogout={handleLogout}
-            />
-
+            <SidebarMenus collapsed={false} menus={sidebarMenus} onLogout={handleLogout} />
           </aside>
-
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-hidden">
-
-        <div className="h-full overflow-y-auto">
-
-          <div className="pt-20 md:pt-8 px-4 md:px-8 pb-8 max-w-7xl mx-auto">
-
-            <Outlet />
-
-          </div>
-
+      {/* Main Content Area */}
+      <main className="flex-1 h-full overflow-y-auto relative scroll-smooth">
+        <div className="pt-20 md:pt-10 px-4 md:px-8 pb-12 max-w-[1400px] mx-auto min-h-full">
+          <Outlet />
         </div>
-
       </main>
-
     </div>
   );
 }

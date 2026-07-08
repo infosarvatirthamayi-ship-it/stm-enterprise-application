@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useUserAuth } from "../../context/UserAuthContext";
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMail, FiPhone, FiShield, FiEdit2, FiCheck, FiArrowLeft, FiCamera, FiImage, FiCalendar, FiDownload, FiMapPin, FiUser, FiX } from 'react-icons/fi';
+import { FiShield, FiEdit2, FiArrowLeft, FiCamera, FiImage, FiX } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import api from '../../api/api';
@@ -9,12 +9,11 @@ import { getFullImageUrl } from '../../utils/config';
 import { toast, Toaster } from 'react-hot-toast';
 
 const UserProfile = () => {
-  const { user, setUser } = useAuth();
+  // 🎯 EXTRACTED refreshUser INSTEAD OF setUser
+  const { user, refreshUser } = useUserAuth();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [bookings, setBookings] = useState([]);
-  const [fetchingBookings, setFetchingBookings] = useState(true);
   
   const profileInputRef = useRef(null);
   const bannerInputRef = useRef(null); 
@@ -29,6 +28,7 @@ const UserProfile = () => {
 
   const [previews, setPreviews] = useState({ profile: null, banner: null });
   const [files, setFiles] = useState({ profile: null, banner: null });
+  const [removeFlags, setRemoveFlags] = useState({ profile: false, banner: false });
 
   useEffect(() => {
     if (user) {
@@ -43,25 +43,15 @@ const UserProfile = () => {
         profile: user.profile_picture ? getFullImageUrl(user.profile_picture) : null,
         banner: user.banner_image ? getFullImageUrl(user.banner_image) : "/assets/banner-bg.png" 
       });
-      fetchUserBookings();
     }
   }, [user]);
-
-  const fetchUserBookings = async () => {
-    try {
-      setFetchingBookings(true);
-      const res = await api.get(`/user/my-temple-bookings?_t=${new Date().getTime()}`);
-      let fetchedData = res.data?.data?.data || res.data?.data || res.data?.bookings || res.data;
-      setBookings(Array.isArray(fetchedData) ? fetchedData : []);
-    } catch (err) { setBookings([]); }
-    finally { setFetchingBookings(false); }
-  };
 
   const handleFileChange = (e, type) => {
     const file = e.target.files[0];
     if (file) {
       setFiles(prev => ({ ...prev, [type]: file }));
       setPreviews(prev => ({ ...prev, [type]: URL.createObjectURL(file) }));
+      setRemoveFlags(prev => ({ ...prev, [type]: false }));
     }
   };
 
@@ -71,21 +61,33 @@ const UserProfile = () => {
       const data = new FormData();
       Object.keys(formData).forEach(key => data.append(key, formData[key]));
       
-      // Attach the files if they exist
       if (files.profile) data.append('profile_picture', files.profile);
       if (files.banner) data.append('banner_image', files.banner);
 
-      // We let Axios auto-generate the boundary header for FormData
-      const res = await api.put('/user/update-profile', data);
-      
+      if (removeFlags.profile && !files.profile) data.append('remove_profile_picture', 'true');
+      if (removeFlags.banner && !files.banner) data.append('remove_banner_image', 'true');
+
+      const res = await api.put('/user/update-profile', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
       if (res.data.success || res.data.status === "true") {
-        const updatedUser = res.data.data || res.data.user;
-        setUser(updatedUser);
-        localStorage.setItem("user", JSON.stringify(updatedUser));
+        // 🎯 BFF SYNC PROTOCOL: No localStorage needed.
+        // Tell the context to fetch the fresh, secure truth from the backend!
+        if (refreshUser) await refreshUser(); 
+        
         setIsModalOpen(false);
+        setFiles({ profile: null, banner: null });
+        setRemoveFlags({ profile: false, banner: false });
+        
         toast.success("Profile Updated Successfully");
       }
-    } catch (err) { toast.error("Failed to update profile"); }
+    } catch (err) { 
+      toast.error("Failed to update profile"); 
+      console.error("Upload Error:", err);
+    }
     finally { setLoading(false); }
   };
 
@@ -101,13 +103,13 @@ const UserProfile = () => {
 
         <section className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
             <div className="h-40 md:h-56 relative overflow-hidden bg-slate-200">
-                <img src={previews.banner} className="w-full h-full object-cover" alt="Banner" />
+                <img src={previews.banner || "/assets/banner-bg.png"} className="w-full h-full object-cover" alt="Banner" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/50"></div>
             </div>
 
             <div className="px-8 pb-8">
                 <div className="flex flex-col md:flex-row items-center md:items-end gap-8 -mt-16 md:-mt-20 mb-8 relative z-10">
-                    <div className="w-36 h-36 rounded-3xl bg-slate-200 overflow-hidden shadow-2xl border-4 border-white dark:border-slate-900">
+                    <div className="w-36 h-36 rounded-3xl bg-slate-200 overflow-hidden shadow-2xl border-4 border-white dark:border-slate-900 relative">
                         <img src={previews.profile || "/avatar-placeholder.png"} className="w-full h-full object-cover" />
                     </div>
                     <div className="text-center md:text-left flex-1 pb-4">
@@ -121,8 +123,7 @@ const UserProfile = () => {
                     </button>
                 </div>
 
-                <div className="grid md:grid-cols-4 gap-4">
-                    <StatsTile label="Visits" value={bookings.length} />
+                <div className="grid md:grid-cols-3 gap-4">
                     <StatsTile label="Membership" value="Active" color="text-emerald-500" />
                     <StatsTile label="Gender" value={formData.gender === '1' ? 'Male' : formData.gender === '2' ? 'Female' : 'Other'} />
                     <StatsTile label="DOB" value={formData.date_of_birth || "N/A"} />
@@ -138,10 +139,21 @@ const UserProfile = () => {
                 <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] relative shadow-2xl overflow-hidden">
                     
                     <div className="h-32 relative bg-slate-200">
-                        <img src={previews.banner} className="w-full h-full object-cover opacity-70" alt="banner preview" />
-                        <button onClick={() => bannerInputRef.current.click()} className="absolute inset-0 m-auto w-fit h-fit bg-black/60 text-white px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 backdrop-blur-md hover:bg-black/80 transition-all shadow-xl">
-                            <FiImage /> Change Banner
-                        </button>
+                        <img src={previews.banner || "/assets/banner-bg.png"} className="w-full h-full object-cover opacity-70" alt="banner preview" />
+                        
+                        <div className="absolute inset-0 m-auto w-fit h-fit flex items-center gap-2">
+                            <button onClick={() => bannerInputRef.current.click()} className="bg-black/60 text-white px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 backdrop-blur-md hover:bg-black/80 transition-all shadow-xl">
+                                <FiImage /> Change Banner
+                            </button>
+                            <button onClick={() => { 
+                                setPreviews({...previews, banner: "/assets/banner-bg.png"}); 
+                                setFiles({...files, banner: null}); 
+                                setRemoveFlags({...removeFlags, banner: true}); 
+                            }} className="bg-red-500/80 text-white p-2 rounded-full flex items-center justify-center backdrop-blur-md hover:bg-red-600 transition-all shadow-xl">
+                                <FiX size={16} />
+                            </button>
+                        </div>
+
                         <input type="file" ref={bannerInputRef} hidden accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} />
                     </div>
 
@@ -149,11 +161,23 @@ const UserProfile = () => {
                     
                     <div className="p-8 pt-0">
                         <div className="relative -mt-12 mb-6 flex justify-center">
-                            <div className="relative w-24 h-24">
+                            <div className="relative w-24 h-24 group">
                                 <img src={previews.profile || "/avatar-placeholder.png"} className="w-full h-full rounded-2xl object-cover bg-slate-200 border-4 border-white dark:border-slate-900 shadow-xl" />
-                                <button onClick={() => profileInputRef.current.click()} className="absolute -bottom-2 -right-2 p-2 bg-purple-600 text-white rounded-xl shadow-lg hover:scale-110 transition-transform">
+                                
+                                <button onClick={() => profileInputRef.current.click()} className="absolute -bottom-2 -right-2 p-2 bg-purple-600 text-white rounded-xl shadow-lg hover:scale-110 transition-transform z-10">
                                     <FiCamera size={16} />
                                 </button>
+                                
+                                {previews.profile && !previews.profile.includes("placeholder") && (
+                                  <button onClick={() => { 
+                                      setPreviews({...previews, profile: null}); 
+                                      setFiles({...files, profile: null}); 
+                                      setRemoveFlags({...removeFlags, profile: true}); 
+                                  }} className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:scale-110 transition-transform opacity-0 group-hover:opacity-100 z-10">
+                                      <FiX size={14} />
+                                  </button>
+                                )}
+
                                 <input type="file" ref={profileInputRef} hidden accept="image/*" onChange={(e) => handleFileChange(e, 'profile')} />
                             </div>
                         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
-import { Compass, Shield, Globe, Landmark, Users, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
+import { Compass, Shield, Globe, Landmark, Users, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import Navbar from "../components/Navbar";
 import SectionHeading from "../components/SectionHeading";
 import SectionDivider from "../components/SectionDivider";
@@ -11,7 +11,6 @@ import heritageMain from "../assets/hero-bg.jpg";
 
 /**
  * --- High-Performance Animated Counter ---
- * Animates numbers from 0 to the target value
  */
 function Counter({ value }) {
   const count = useMotionValue(0);
@@ -32,17 +31,27 @@ function Counter({ value }) {
 export default function About() {
   const [data, setData] = useState({ stats: null, gallery: [] });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null); // 🛡️ ADDED: Error state
 
-  // 1. Fetch Stats and Gallery Images from aboutController
+  // 1. Fetch Stats and Gallery Images
   useEffect(() => {
     const fetchAboutData = async () => {
       try {
-        const res = await api.get("/user/about-data");
+        setError(null);
+        // 🎯 FIX: Added the /web prefix to match your backend mount path
+        const res = await api.get("/user/about-data"); 
+        
         if (res.data.success) {
-          setData({ stats: res.data.stats, gallery: res.data.gallery });
+          setData({ 
+            stats: res.data.stats || {}, 
+            gallery: res.data.gallery || [] 
+          });
+        } else {
+          throw new Error("Failed to load platform data");
         }
       } catch (err) {
         console.error("Failed to load about data:", err.response?.data || err.message);
+        setError("Unable to sync with the divine archives. Please try again later.");
       } finally {
         setLoading(false);
       }
@@ -66,6 +75,18 @@ export default function About() {
     );
   }
 
+  // 🛡️ ADDED: Graceful Error UI
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 px-6 text-center">
+        <Navbar />
+        <AlertCircle className="text-rose-500 mb-4" size={48} />
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Connection Interrupted</h2>
+        <p className="text-slate-500 dark:text-slate-400 max-w-md">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-500 overflow-x-hidden">
       <Navbar />
@@ -78,7 +99,6 @@ export default function About() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8 flex flex-col items-center"
           >
-            {/* The Decorative Heading Sandwich */}
             <SectionHeading title="About Us" />
             <SectionDivider />
           </motion.div>
@@ -96,71 +116,75 @@ export default function About() {
       </section>
 
       {/* --- STATS GRID --- */}
-      <section className="px-6 py-12 max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
-          {data.stats && statConfig.map((stat, i) => (
-            <motion.div 
-              key={i} 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="group relative bg-white dark:bg-slate-900 p-6 md:p-10 rounded-[2.5rem] text-center border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-2xl transition-all duration-500"
-            >
-              <div className="mb-4 inline-flex p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/50 transition-all">
-                {stat.icon}
-              </div>
-              <div className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white mb-1">
-                <Counter value={data.stats[stat.key]} />+
-              </div>
-              <div className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.2em]">
-                {stat.label}
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+      {data.stats && Object.keys(data.stats).length > 0 && (
+        <section className="px-6 py-12 max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+            {statConfig.map((stat, i) => (
+              <motion.div 
+                key={i} 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="group relative bg-white dark:bg-slate-900 p-6 md:p-10 rounded-[2.5rem] text-center border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-2xl transition-all duration-500"
+              >
+                <div className="mb-4 inline-flex p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/50 transition-all">
+                  {stat.icon}
+                </div>
+                <div className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white mb-1">
+                  <Counter value={data.stats[stat.key]} />+
+                </div>
+                <div className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.2em]">
+                  {stat.label}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* --- INFINITE GALLERY --- */}
-      <section className="py-20 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 mb-12 flex flex-col md:flex-row md:items-end justify-between gap-4 text-center md:text-left">
-          <div>
-            <h3 className="text-indigo-600 dark:text-amber-400 font-black uppercase tracking-widest text-xs mb-2">Divine Heritage</h3>
-            <h2 className="text-3xl md:text-4xl font-serif font-bold dark:text-white">Ancient Shrines & Rituals</h2>
+      {data.gallery && data.gallery.length > 0 && (
+        <section className="py-20 overflow-hidden">
+          <div className="max-w-7xl mx-auto px-6 mb-12 flex flex-col md:flex-row md:items-end justify-between gap-4 text-center md:text-left">
+            <div>
+              <h3 className="text-indigo-600 dark:text-amber-400 font-black uppercase tracking-widest text-xs mb-2">Divine Heritage</h3>
+              <h2 className="text-3xl md:text-4xl font-serif font-bold dark:text-white">Ancient Shrines & Rituals</h2>
+            </div>
+            <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xs mx-auto md:mx-0">
+              Connecting the modern seeker with eternal wisdom through technology.
+            </p>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xs mx-auto md:mx-0">
-            Connecting the modern seeker with eternal wisdom through technology.
-          </p>
-        </div>
 
-        <div className="flex relative group">
-          <motion.div 
-            className="flex gap-4 md:gap-8 whitespace-nowrap px-4"
-            animate={{ x: ["0%", "-50%"] }}
-            transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
-          >
-            {[...data.gallery, ...data.gallery].map((item, i) => (
-              <div 
-                key={i} 
-                className="w-[280px] md:w-[420px] h-[200px] md:h-[280px] shrink-0 relative group rounded-[2.5rem] overflow-hidden shadow-xl border-4 border-white dark:border-slate-900"
-              >
-                <img 
-                  src={item.url} 
-                  alt={item.title} 
-                  className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-1000 group-hover:scale-110" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-end p-6 md:p-10">
-                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] mb-2 px-3 py-1 rounded-full w-fit ${item.type === 'Ritual' ? 'bg-rose-500 text-white' : 'bg-indigo-600 text-white'}`}>
-                    {item.type}
-                  </span>
-                  <p className="text-white text-lg md:text-xl font-bold truncate">{item.title}</p>
-                  <p className="text-slate-300 text-xs md:text-sm truncate">{item.subtitle}</p>
+          <div className="flex relative group">
+            <motion.div 
+              className="flex gap-4 md:gap-8 whitespace-nowrap px-4"
+              animate={{ x: ["0%", "-50%"] }}
+              transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
+            >
+              {[...data.gallery, ...data.gallery].map((item, i) => (
+                <div 
+                  key={i} 
+                  className="w-[280px] md:w-[420px] h-[200px] md:h-[280px] shrink-0 relative group rounded-[2.5rem] overflow-hidden shadow-xl border-4 border-white dark:border-slate-900"
+                >
+                  <img 
+                    src={item.url} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-1000 group-hover:scale-110" 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-end p-6 md:p-10">
+                    <span className={`text-[10px] font-black uppercase tracking-[0.2em] mb-2 px-3 py-1 rounded-full w-fit ${item.type === 'Ritual' ? 'bg-rose-500 text-white' : 'bg-indigo-600 text-white'}`}>
+                      {item.type}
+                    </span>
+                    <p className="text-white text-lg md:text-xl font-bold truncate">{item.title}</p>
+                    <p className="text-slate-300 text-xs md:text-sm truncate">{item.subtitle}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
+              ))}
+            </motion.div>
+          </div>
+        </section>
+      )}
 
       {/* --- MISSION & ARTISTIC VISUAL --- */}
       <section className="px-6 py-20 max-w-7xl mx-auto">
@@ -196,9 +220,6 @@ export default function About() {
   );
 }
 
-/**
- * Reusable Value Item Component
- */
 function ValueItem({ icon, title, desc }) {
   return (
     <div className="flex gap-5 group">

@@ -1,109 +1,66 @@
+// src/services/authService.js
 import api from "../api/api";
 
-export const adminLogin = async (email, password) => {
-  const response = await api.post("/admin/auth/login", {
-    email,
-    password,
+export const userLogin = async (identifier, password) => {
+  // 🎯 THE FIX: Send the unified identifier directly to the correct /user/login endpoint
+  const response = await api.post("web/user/login", { 
+    identifier: String(identifier).trim(),
+    password 
   });
-
-  if (response.data.success || response.data.status === "true") {
-    authService.setSession(response.data, "admin");
-  }
-
   return response.data;
 };
 
-export const userLogin = async (mobile, password) => {
-  const response = await api.post("/user/login", {
-    mobile: mobile,
-    password: password,
-  });
+export const adminLogin = async (email, password) => {
+  // 🎯 THE FIX: Aligned with backend webRoutes.js (/admin/auth/login)
+  const response = await api.post("/admin/login", { email, password });
+  return response.data;
+};
 
-  if (response.data.success || response.data.status === "true") {
-    authService.setSession(response.data, "user");
-  }
-
+// 🎯 Isolated Temple Admin Login Gateway
+export const templeAdminLogin = async (email, password) => {
+  const response = await api.post("/temple-admin/login", { email, password });
   return response.data;
 };
 
 export const userSignup = async (userData) => {
   const payload = {
-    first_name: userData.firstName || userData.first_name,
-    last_name: userData.lastName || userData.last_name || "",
+    first_name: userData.firstName,
     email: userData.email,
-    mobile_number: userData.mobileNumber || userData.mobile_number || userData.mobile, 
+    mobile_number: userData.mobileNumber || userData.mobile,
     password: userData.password
   };
-  
   const response = await api.post("/user/signup", payload);
+  return response.data;
+};
+
+// 🎯 UPDATE: Support 3 distinct logout routes aligned exactly with the backend
+export const logout = async (role = "user") => {
+  let logoutUrl = "/user/logout";
+  if (role === "admin") logoutUrl = "/admin/auth/logout"; 
+  if (role === "temple-admin") logoutUrl = "/temple-admin/logout";
+  
+  return await api.post(logoutUrl);
+};
+
+// 🎯 Centralized Check-Auth calls for the Contexts
+export const checkAdminAuth = async () => {
+  const response = await api.get("/admin/check-auth");
+  return response.data;
+};
+
+export const checkTempleAdminAuth = async () => {
+  const response = await api.get("/temple-admin/check-auth");
   return response.data;
 };
 
 export const authService = {
   adminLogin,
+  templeAdminLogin,
   userLogin,
   userSignup,
-
-  setSession: (responseData, role = "user") => {
-    // 🎯 FIX 1: Smart extraction. It checks for '.user' first, then '.data'
-    const userObj = responseData.user || responseData.data;
-    
-    // 🎯 FIX 2: Smart token extraction. It checks for '.token' first.
-    const tokenStr = responseData.token || responseData.data?.access_token || responseData.data?.accessToken;
-
-    if (role === "admin") {
-      if (userObj) {
-        localStorage.setItem("admin", JSON.stringify(userObj));
-      }
-      // 🎯 FIX 3: Actually SAVE the token instead of deleting it!
-      if (tokenStr) {
-        localStorage.setItem("adminToken", tokenStr); 
-      }
-    } else {
-      if (userObj) {
-        localStorage.setItem("user", JSON.stringify(userObj));
-      }
-      // 🎯 FIX 3: Actually SAVE the token instead of deleting it!
-      if (tokenStr) {
-        localStorage.setItem("token", tokenStr); 
-      }
-    }
-  },
-
-  logout: async (role = null) => {
-    const currentPath = window.location.pathname;
-    const targetRole =
-      role ||
-      (currentPath.startsWith("/admin") || currentPath.startsWith("/temple-admin")
-        ? "admin"
-        : "user");
-
-    try {
-      const logoutUrl =
-        targetRole === "admin" ? "/admin/auth/logout" : "/auth/logout";
-
-      await api.post(logoutUrl);
-    } catch (e) {
-      console.error(`${targetRole} logout failed`);
-    } finally {
-      // Clear absolutely everything on logout
-      localStorage.removeItem("admin");
-      localStorage.removeItem("user");
-      localStorage.removeItem("adminToken");
-      localStorage.removeItem("token");
-
-      window.location.href =
-        targetRole === "admin" ? "/admin/login" : "/user/login";
-    }
-  },
-
-  getUser: (role = "user") => {
-    try {
-      const key = role === "admin" ? "admin" : "user";
-      const userData = localStorage.getItem(key);
-      return userData ? JSON.parse(userData) : null;
-    } catch {
-      return null;
-    }
-  },
+  logout,
+  checkAdminAuth,
+  checkTempleAdminAuth
 };
+
+export default authService;

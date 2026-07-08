@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "../../../context/AuthContext";
+import { useUserAuth } from "../../../context/UserAuthContext";
+import { useTheme } from "../../../context/ThemeContext";
 import api from "../../../api/api";
 import { toast, Toaster } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,8 +14,8 @@ import {
 export default function BookingForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading, dark } = useAuth();
-
+  const { user, loading: authLoading } = useUserAuth();
+  const { isDarkMode: dark } = useTheme();
   const [temple, setTemple] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);

@@ -1,8 +1,10 @@
 import React from "react";
 import { Route } from "react-router-dom";
 
-import ProtectedRoute from "../components/ProtectedRoute";
+import LocationManager from '../pages/admin/LocationManager';
 
+import { AdminProtectedRoute } from "../components/protected/AdminProtectedRoute";
+import CreateTempleAdmin from "../pages/admin/CreateTempleAdmin";
 /*
 |--------------------------------------------------------------------------
 | Dashboard
@@ -125,14 +127,17 @@ export const AdminRoutes = [
     key="admin-layout"
     path="/admin"
     element={
-      <ProtectedRoute allowedTypes={[1]}>
+      <AdminProtectedRoute allowedTypes={[1]}>
         <Dashboard />
-      </ProtectedRoute>
+      </AdminProtectedRoute>
     }
   >
 
     {/* Dashboard */}
     <Route path="dashboard" element={<DashboardHome />} />
+    
+    <Route path="create-temple-admin" element={<CreateTempleAdmin />} />
+     <Route path="locations" element={<LocationManager />} />
 
     {/* Users */}
     <Route path="user/list" element={<UsersList />} />

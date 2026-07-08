@@ -69,15 +69,82 @@ exports.verifyOtp = async (req, res) => {
     } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
+// 🎯 THE FIX: Robust Login with Cookie Injection & Mobile/Email support
 exports.loginUser = async (req, res) => {
     try {
-        const { mobile, password } = req.body;
-        const user = await User.findOne({ mobile_number: mobile?.trim() });
-        if (!user || !(await user.matchPassword(password))) return res.status(401).json({ success: false, message: "Invalid Credentials" });
+        // Accepts both identifier (frontend default) OR email/mobile directly
+        const { identifier, email, mobile_number, mobile, password } = req.body;
+        const loginId = String(identifier || email || mobile_number || mobile || "").trim().toLowerCase();
+
+        if (!loginId || !password) {
+            return res.status(400).json({ success: false, message: "Missing credentials." });
+        }
+
+        // Determine if input is Email or Mobile
+        let query = {};
+        if (loginId.includes('@')) {
+            query = { email: loginId };
+        } else {
+            // 1. Strip all non-digit characters (e.g., +, spaces, dashes)
+            const cleanInput = loginId.replace(/\D/g, ""); 
+            
+            // 2. Extract the last 10 digits to act as our base search
+            const baseTen = cleanInput.slice(-10); 
+
+            // 3. Search for exact matches across all likely storage permutations
+            query = { 
+                $or: [
+                    { mobile_number: baseTen },                            // e.g., 9182635762
+                    { mobile_number: `91${baseTen}` },                     // e.g., 919182635762
+                    { mobile_number: `+91${baseTen}` },                    // e.g., +919182635762
+                    { mobile_number: { $regex: new RegExp(baseTen + "$") } }// Fallback: ends with 10 digits
+                ] 
+            };
+        }
+
+        const user = await User.findOne(query);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "Account not found." });
+        }
+
+        const isPasswordMatch = await user.matchPassword(password);
+        if (!isPasswordMatch) {
+            return res.status(401).json({ success: false, message: "Invalid Credentials" });
+        }
         
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-        res.status(200).json({ success: true, token, user: { id: user._id, name: user.name, first_name: user.first_name } });
-    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+        
+        // 🎯 CRITICAL: Set the HTTP-Only cookie for React context to pick up
+        res.cookie("access_token", token, { 
+            httpOnly: true, 
+            secure: process.env.NODE_ENV === 'production', 
+            sameSite: "lax",
+            path: '/'
+        });
+
+        res.status(200).json({ 
+            success: true, 
+            token, 
+            user: { id: user._id, name: user.name, first_name: user.first_name, role: user.role } 
+        });
+    } catch (error) { 
+        res.status(500).json({ success: false, message: error.message }); 
+    }
+};
+
+// 🎯 THE FIX: Add the Missing Logout Function
+exports.logoutUser = async (req, res) => {
+    try {
+        res.clearCookie("access_token", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: "lax",
+            path: '/'
+        });
+        return res.status(200).json({ success: true, message: "Logged out successfully." });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Logout failed." });
+    }
 };
 
 exports.getProfile = async (req, res) => {
@@ -108,7 +175,7 @@ exports.getProfile = async (req, res) => {
                 mobileNumber: user.mobile_number || "",
                 profile_picture: user.profile_picture || "",
                 profilePicture: user.profile_picture || "",
-                banner_image: user.banner_image || "", // 🎯 Return banner image
+                banner_image: user.banner_image || "",
                 date_of_birth: user.date_of_birth || "",
                 dateOfBirth: user.date_of_birth || "",
                 gender: String(user.gender || "1"),
@@ -137,7 +204,6 @@ exports.updateProfile = async (req, res) => {
             name: `${first_name} ${last_name || ''}`.trim()
         };
 
-        // 🎯 THE FIX: Handle BOTH profile_picture AND banner_image from upload.fields()
         if (req.files) {
             if (req.files.profile_picture && req.files.profile_picture.length > 0) {
                 updateData.profile_picture = req.files.profile_picture[0].path;
@@ -146,7 +212,6 @@ exports.updateProfile = async (req, res) => {
                 updateData.banner_image = req.files.banner_image[0].path;
             }
         } else if (req.file) {
-            // Fallback for upload.single() from Flutter
             updateData.profile_picture = req.file.path;
         }
 
@@ -164,18 +229,7 @@ exports.updateProfile = async (req, res) => {
             status: "true",
             success: true,
             message: "Profile updated successfully.", 
-            data: {
-                user_id: updatedUser.sql_id || parseInt(updatedUser._id.toString().substring(0, 8), 16),
-                first_name: updatedUser.first_name || "",
-                last_name: updatedUser.last_name || "",
-                email: updatedUser.email || "",
-                mobile_number: updatedUser.mobile_number || "",
-                date_of_birth: updatedUser.date_of_birth || "",
-                gender: String(updatedUser.gender || "1"),
-                profile_picture: updatedUser.profile_picture || "",
-                banner_image: updatedUser.banner_image || "", // 🎯 Send back the updated banner
-                user_type: String(updatedUser.user_type || "3")
-            }
+            data: updatedUser // Simplified for response payload
         });
     } catch (error) {
         console.error("🔥 Update Error:", error);
@@ -200,8 +254,6 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const updateData = { ...req.body };
-
-        // 🎯 THE FIX applied here as well for Admin actions
         if (req.files) {
             if (req.files.profile_picture) updateData.profile_picture = req.files.profile_picture[0].path;
             if (req.files.banner_image) updateData.banner_image = req.files.banner_image[0].path;
@@ -312,6 +364,7 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
+// 🎯 THE FIX: Ensure all methods, especially logoutUser, are exported!
 module.exports = {
     signupUser: exports.signupUser,
     signUp: exports.signupUser,     
@@ -319,6 +372,8 @@ module.exports = {
     verifyOTP: exports.verifyOtp,   
     loginUser: exports.loginUser,
     login: exports.loginUser,       
+    logoutUser: exports.logoutUser, // ADDED
+    logout: exports.logoutUser,     // ADDED
     getProfile: exports.getProfile, 
     updateProfile: exports.updateProfile,
     checkAuth: exports.getProfile,  

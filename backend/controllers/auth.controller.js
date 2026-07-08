@@ -1,75 +1,148 @@
+/**
+ * =========================================================================
+ * 🌐 Sarvatirthamayi Core Authentication & Omnichannel Notification Controller
+ * 🎯 STRICTLY ISOLATED TO DEVOTEES (USER_TYPE: 3)
+ * =========================================================================
+ */
+
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 
+// 🛡️ Safe Twilio Initialization Fallback to protect local sandbox instances
+let twilioClient = null;
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+} else {
+    console.warn("⚠️ Warning: Twilio credentials missing. Telephony verification layers will fallback to local generation.");
+}
+
 /**
- * 🎯 EMAIL CONFIGURATION
- * Optimized for VM environments with IPv4 force and connection timeouts.
+ * 🎯 EMAIL ENGINE (NODEMAILER)
  */
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true, // true for 465, false for other ports
+    host: process.env.MAIL_HOST || "smtp.gmail.com",
+    port: Number(process.env.MAIL_PORT || 465),
+    secure: true, 
     auth: {
         user: process.env.MAIL_USER,
         pass: process.env.MAIL_PASS, 
     },
-    // 🛡️ THE BOSS FIXES:
-    family: 4,               // Forces IPv4 (prevents VM IPv6 timeouts)
-    socketTimeout: 30000,    // Give it 30 seconds to breathe
+    family: 4,               
+    socketTimeout: 30000,    
     greetingTimeout: 30000,
     tls: {
         rejectUnauthorized: false,
-        servername: 'smtp.gmail.com' // Forces correct SSL handshake
+        servername: process.env.MAIL_HOST || 'smtp.gmail.com' 
     }
 });
 
-// -------------------- HELPERS --------------------
+// =========================================================================
+// 📡 1. OMNICHANNEL NOTIFICATION HUB (Parallel Execution Pipeline)
+// =========================================================================
+const NotificationHub = {
+    dispatchOtp: async (email, formattedMobile, rawOtp, subject) => {
+        const dispatches = [];
+
+        if (Number(process.env.ENABLE_EMAIL_OTP) === 1 && email) {
+            dispatches.push(
+                transporter.sendMail({
+                    from: `Sarvatirthamayi <${process.env.MAIL_FROM}>`,
+                    to: email,
+                    subject: subject || "Verification Code",
+                    html: `<b>Your Sarvatirthamayi verification code is: <span style="font-size: 16px; letter-spacing: 1px;">${rawOtp}</span></b><p>Valid for 10 minutes. Do not share this secure passkey.</p>`,
+                })
+                .then(() => console.log(`✉️ OTP Email successfully dispatched to: ${email}`))
+                .catch(err => console.error(`❌ Email Gateway Failed: ${err.message}`))
+            );
+        }
+
+        if (Number(process.env.ENABLE_SMS_OTP) === 1 && formattedMobile && twilioClient) {
+            dispatches.push(
+                twilioClient.verify.v2
+                    .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+                    .verifications.create({ to: formattedMobile, channel: 'sms' })
+                    .then((v) => console.log(`📱 Twilio Verify SMS Dispatched. Status: ${v.status}`))
+                    .catch(err => console.error(`❌ Twilio SMS Gateway Failed: ${err.message}`))
+            );
+        }
+
+        if (Number(process.env.ENABLE_WHATSAPP_OTP) === 1 && formattedMobile && twilioClient) {
+            dispatches.push(
+                twilioClient.verify.v2
+                    .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+                    .verifications.create({ to: `whatsapp:${formattedMobile}`, channel: 'whatsapp' })
+                    .then((v) => console.log(`💬 Twilio WhatsApp Dispatched. Status: ${v.status}`))
+                    .catch(err => console.error(`❌ WhatsApp Gateway Failed: ${err.message}`))
+            );
+        }
+
+        await Promise.all(dispatches);
+    },
+
+    verifyMobileToken: async (formattedMobile, code) => {
+        if (Number(process.env.ENABLE_SMS_OTP) === 0 && Number(process.env.ENABLE_WHATSAPP_OTP) === 0) {
+            return true; 
+        }
+        if (!twilioClient) {
+            console.error("🚨 Twilio client unavailable. Blocking code registration verification.");
+            return false;
+        }
+        try {
+            const check = await twilioClient.verify.v2
+                .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+                .verificationChecks.create({ to: formattedMobile, code: String(code).trim() });
+                
+            return check.status === 'approved';
+        } catch (error) {
+            console.error("❌ Telephony token validation failure:", error.message);
+            return false;
+        }
+    }
+};
+
+// =========================================================================
+// 🛠️ 2. UTILITY PARSERS & IDENTITY SERIALIZERS
+// =========================================================================
 
 const getFullImageUrl = (path) => {
     if (!path) return "";
-    return `https://api.sarvatirthamayi.com/${String(path).replace(/\\/g, "/")}`;
+    const baseUrl = process.env.BASE_ASSET_URL || "http://localhost:5000";
+    const cleanPath = String(path).replace(/\\/g, "/").replace(/^\/+/, ""); 
+    return `${baseUrl}/${cleanPath}`;
 };
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 
 const normalizeMobile = (mobile) => {
-    const digits = String(mobile || "").replace(/\D/g, "");
-    return digits ? digits.slice(-10) : "";
+    const rawInput = String(mobile || "").trim();
+    if (rawInput.startsWith("+")) return `+${rawInput.replace(/\D/g, "")}`;
+
+    let digits = rawInput.replace(/\D/g, "");
+    if (!digits || digits.length < 7) return ""; 
+
+    if (digits.length === 10) return `+91${digits}`;
+    if (digits.length === 11 && digits.startsWith("0")) return `+91${digits.slice(1)}`;
+    if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`; 
+
+    return `+${digits}`;
 };
 
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 const generateAccessToken = (user) =>
     jwt.sign(
-        { id: user._id, user_type: user.user_type, role: user.role },
+        { 
+            id: user._id.toString(), 
+            user_type: Number(user.user_type || 3), 
+            role: user.role || "user", 
+            sql_id: user.sql_id || 0 
+        },
         process.env.JWT_SECRET,
         { expiresIn: "30d" }
     );
 
-/**
- * 🎯 Centralized Mailer with Terminal Debugging
- * Even if email fails, the OTP is printed to the terminal for development.
- */
-const sendOtpEmail = async (email, otp, subject = "Your OTP for STM Club") => {
-    //console.log(`🚀 ATTEMPTING MAIL: To ${email} | OTP: ${otp}`);
-    
-    try {
-        const info = await transporter.sendMail({
-            from: `STM Club <${process.env.MAIL_FROM}>`,
-            to: email,
-            subject: subject,
-            text: `Your STM Club verification code is: ${otp}`,
-            html: `<b>Your STM Club verification code is: ${otp}</b><p>Valid for 10 minutes.</p>`,
-        });
-        console.log("✅ MAIL SENT SUCCESSFULLY:", info.messageId);
-        return true;
-    } catch (error) {
-        console.error("❌ NODEMAILER FAILURE:", error.code, error.message);
-        return false;
-    }
-};
-const buildAuthUserResponse = (user, token = "") => ({
+const serializeUserBase = (user) => ({
     id: user._id.toString(),
     user_id: user._id.toString(),
     userId: user._id.toString(),
@@ -82,8 +155,6 @@ const buildAuthUserResponse = (user, token = "") => ({
     mobileNumber: user.mobile_number || "",
     user_type: String(user.user_type || 3),
     userType: String(user.user_type || 3),
-    access_token: token || "",
-    accessToken: token || "",
     profile_picture: getFullImageUrl(user.profile_picture) || ""
 });
 
@@ -93,7 +164,9 @@ const handleDuplicateKeyError = (error, res) => {
     return true;
 };
 
-// -------------------- CONTROLLERS --------------------
+// =========================================================================
+// 🔄 3. CORE REGISTRATION & ACCOUNT RECOVERY PIPELINES (DEVOTEES ONLY)
+// =========================================================================
 
 exports.signUp = async (req, res) => {
     try {
@@ -102,7 +175,7 @@ exports.signUp = async (req, res) => {
         const cleanMobile = normalizeMobile(req.body.mobile_number || req.body.mobileNo);
 
         if (!first_name || !emailAddr || !cleanMobile || !password) {
-            return res.status(400).json({ status: "false", message: "Missing fields." });
+            return res.status(400).json({ status: "false", message: "Missing required fields." });
         }
 
         let user = await User.findOne({ $or: [{ email: emailAddr }, { mobile_number: cleanMobile }] });
@@ -110,26 +183,31 @@ exports.signUp = async (req, res) => {
         const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
         if (user) {
+            if (user.is_verified) return res.status(400).json({ status: "false", message: "Account already exists. Please log in." });
             user.otp = otp;
             user.otp_expires = otpExpires;
+            user.password = password;
             await user.save();
         } else {
+            // 🎯 FORCES user_type: 3 (Devotee). Impossible to create an admin here.
             user = await User.create({
                 first_name, email: emailAddr, mobile_number: cleanMobile,
                 password, otp, otp_expires: otpExpires, is_verified: false, user_type: 3
             });
         }
 
-        // 🎯 AWAIT added so we know if it sent
-        await sendOtpEmail(emailAddr, otp, "Verify your STM Club Account");
+        await NotificationHub.dispatchOtp(emailAddr, cleanMobile, otp, "Verify your Sarvatirthamayi Account");
 
         return res.status(200).json({
-            status: "true", success: true, message: "OTP sent successfully",
+            status: "true",
+            success: true,
+            message: "Verification profile created. Authorization tokens dispatched.",
             data: { id: user._id.toString(), userId: user._id.toString() }
         });
     } catch (error) {
         if (handleDuplicateKeyError(error, res)) return;
-        res.status(500).json({ status: "false", message: "Signup Error" });
+        console.error("Signup Orchestration Fault:", error);
+        return res.status(500).json({ status: "false", message: "Internal signup orchestration failure." });
     }
 };
 
@@ -138,15 +216,16 @@ exports.verifyOtp = async (req, res) => {
         const mobile = normalizeMobile(req.body.mobile_number || req.body.mobileNumber || req.body.mobileNo);
         const otp = String(req.body.otp || "").trim();
 
-        const user = await User.findOne({
-            mobile_number: mobile,
-            otp: otp,
-            otp_expires: { $gt: Date.now() }
-        });
+        const user = await User.findOne({ mobile_number: mobile });
+        if (!user) return res.status(404).json({ status: "false", success: false, message: "User profile not found." });
 
-        if (!user) {
-            return res.status(400).json({ status: "false", success: false, message: "Invalid or expired OTP." });
+        let isTokenValid = (user.otp === otp && user.otp_expires > Date.now());
+
+        if (!isTokenValid && (Number(process.env.ENABLE_SMS_OTP) === 1 || Number(process.env.ENABLE_WHATSAPP_OTP) === 1)) {
+            isTokenValid = await NotificationHub.verifyMobileToken(mobile, otp);
         }
+
+        if (!isTokenValid) return res.status(400).json({ status: "false", success: false, message: "Invalid or expired authorization code." });
 
         user.is_verified = true;
         user.otp = undefined;
@@ -157,12 +236,16 @@ exports.verifyOtp = async (req, res) => {
         return res.status(200).json({
             status: "true",
             success: true,
-            message: "Account verified successfully!",
+            message: "Account verification confirmed.",
             token: token,
-            data: buildAuthUserResponse(user, token)
+            data: {
+                ...serializeUserBase(user),
+                access_token: token,
+                accessToken: token
+            }
         });
     } catch (error) {
-        res.status(500).json({ status: "false", message: error.message });
+        return res.status(500).json({ status: "false", message: error.message });
     }
 };
 
@@ -178,11 +261,11 @@ exports.resendOtp = async (req, res) => {
         user.otp_expires = new Date(Date.now() + 10 * 60 * 1000);
         await user.save();
 
-        sendOtpEmail(user.email, otp);
+        await NotificationHub.dispatchOtp(user.email, mobileNumber, otp, "Resend: Verify your Sarvatirthamayi Account");
 
-        return res.status(200).json({ status: "true", success: true, message: "OTP resent successfully" });
+        return res.status(200).json({ status: "true", success: true, message: "OTP resent successfully across channels" });
     } catch (error) {
-        res.status(500).json({ status: "false", message: error.message });
+        return res.status(500).json({ status: "false", message: error.message });
     }
 };
 
@@ -192,7 +275,6 @@ exports.forgotPassword = async (req, res) => {
         const mobile = normalizeMobile(req.body.mobile_number || req.body.mobileNo);
 
         let user = email ? await User.findOne({ email }) : await User.findOne({ mobile_number: mobile });
-
         if (!user) return res.status(404).json({ status: "false", message: "No account found." });
 
         const otp = generateOtp();
@@ -200,18 +282,14 @@ exports.forgotPassword = async (req, res) => {
         user.otp_expires = new Date(Date.now() + 10 * 60 * 1000);
         await user.save();
 
-        if (user.email) {
-            await sendOtpEmail(user.email, otp, "Password Reset OTP - STM Club");
-        } else {
-            console.log(`👉 TERMINAL OTP FOR MOBILE ${user.mobile_number}: ${otp}`);
-        }
+        await NotificationHub.dispatchOtp(user.email, user.mobile_number, otp, "Password Reset OTP - Sarvatirthamayi");
 
         return res.status(200).json({
-            status: "true", success: true, message: "OTP sent successfully",
+            status: "true", success: true, message: "Recovery credentials dispatched.",
             data: { id: user._id.toString(), userId: user._id.toString() }
         });
     } catch (error) {
-        return res.status(500).json({ status: "false", message: "Server error" });
+        return res.status(500).json({ status: "false", message: "Server recovery pipeline error" });
     }
 };
 
@@ -220,9 +298,15 @@ exports.forgotVerifyOtp = async (req, res) => {
         const userId = req.body.user_id || req.body.userId;
         const otp = String(req.body.otp || "").trim();
 
-        const user = await User.findOne({ _id: userId, otp: otp, otp_expires: { $gt: Date.now() } });
+        const user = await User.findOne({ _id: userId });
+        if (!user) return res.status(404).json({ status: "false", success: false, message: "User not found." });
 
-        if (!user) return res.status(400).json({ status: "false", success: false, message: "Invalid or expired OTP." });
+        let isTokenValid = (user.otp === otp && user.otp_expires > Date.now());
+        if (!isTokenValid && (Number(process.env.ENABLE_SMS_OTP) === 1 || Number(process.env.ENABLE_WHATSAPP_OTP) === 1)) {
+            isTokenValid = await NotificationHub.verifyMobileToken(user.mobile_number, otp);
+        }
+
+        if (!isTokenValid) return res.status(400).json({ status: "false", success: false, message: "Invalid or expired OTP." });
 
         const tempToken = generateAccessToken(user);
         return res.status(200).json({
@@ -247,9 +331,15 @@ exports.resetPassword = async (req, res) => {
             return res.status(400).json({ status: "false", message: "Passwords do not match." });
         }
 
-        const user = await User.findOne({ _id: userId, otp: otp, otp_expires: { $gt: Date.now() } });
+        const user = await User.findOne({ _id: userId });
+        if (!user) return res.status(404).json({ status: "false", message: "User not found." });
 
-        if (!user) return res.status(400).json({ status: "false", message: "Invalid session." });
+        let isTokenValid = (user.otp === otp && user.otp_expires > Date.now());
+        if (!isTokenValid && (Number(process.env.ENABLE_SMS_OTP) === 1 || Number(process.env.ENABLE_WHATSAPP_OTP) === 1)) {
+            isTokenValid = await NotificationHub.verifyMobileToken(user.mobile_number, otp);
+        }
+
+        if (!isTokenValid) return res.status(400).json({ status: "false", message: "Invalid session or OTP." });
 
         user.password = password;
         user.otp = undefined;
@@ -261,46 +351,42 @@ exports.resetPassword = async (req, res) => {
             status: "true",
             success: true,
             message: "Password reset successful",
-            data: buildAuthUserResponse(user, token)
+            data: {
+                ...serializeUserBase(user),
+                access_token: token,
+                accessToken: token
+            }
         });
     } catch (error) {
         return res.status(500).json({ status: "false", message: "Server error" });
     }
 };
 
-exports.login = async (req, res) => {
+// =========================================================================
+// 🛡️ 4. LOGINS (WEB, MOBILE, UNIFIED) - ISOLATED TO DEVOTEES ONLY
+// =========================================================================
+
+exports.loginWeb = async (req, res) => {
     try {
-        // 1. Extract identifiers (Supports both Web 'email' and Flutter 'mobile' keys)
         const email = normalizeEmail(req.body.email);
-        const mobile = normalizeMobile(req.body.mobile || req.body.mobile_number || req.body.mobileNo);
         const password = req.body.password || "";
 
-        // 2. Multi-Identifier Search
-        // This looks for EITHER the email OR the mobile number in your Database
-        const user = await User.findOne({
-            $or: [
-                { email: email },
-                { mobile_number: mobile }
-            ]
-        });
+        if (!email || !password) return res.status(400).json({ success: false, message: "Credentials missing." });
 
-        // 3. Validation Checks
-        if (!user) {
-            return res.status(401).json({ status: "false", message: "User not found." });
+        const user = await User.findOne({ email });
+        
+        if (!user || !user.is_verified || !(await user.matchPassword(password))) {
+            return res.status(401).json({ success: false, message: "Authentication failed: Invalid credentials." });
         }
 
-        if (!user.is_verified) {
-            return res.status(401).json({ status: "false", message: "Account unverified." });
+        // 🚨 Failsafe Shield
+        const type = Number(user.user_type);
+        if (type === 1 || type === 2 || user.role === 'admin' || user.role === 'temple_admin') {
+            return res.status(403).json({ success: false, message: "Access Denied: Admin credentials cannot be used here." });
         }
 
-        // 4. Password Verification
-        const isMatch = await user.matchPassword(password);
-        if (!isMatch) {
-            return res.status(401).json({ status: "false", message: "Invalid password." });
-        }
-
-        // 5. Success Response (Uses your existing helpers to stay consistent with Flutter)
         const token = generateAccessToken(user);
+
         res.cookie("access_token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -308,50 +394,99 @@ exports.login = async (req, res) => {
             maxAge: 30 * 24 * 60 * 60 * 1000,
             path: "/"
         });
-        return res.status(200).json({
-            status: "true",
-            success: true,
-            message: "Login Successful",
-            data: buildAuthUserResponse(user, token)
-        });
 
+        return res.status(200).json({ success: true, message: "Web Portal Authentication Granted.", user: serializeUserBase(user) });
     } catch (error) {
-        console.error("Login Error:", error);
-        res.status(500).json({ status: "false", message: "Login error" });
+        console.error("🌐 Web Login Crash:", error);
+        return res.status(500).json({ success: false, message: "Internal server error during authentication." });
     }
 };
-exports.adminSignup = async (req, res) => {
+
+exports.loginMobile = async (req, res) => {
     try {
-        const { first_name, last_name, email, password, user_type, mobile_number, temple_id } = req.body;
-        const normalizedEmail = normalizeEmail(email);
-        const normalizedMobile = normalizeMobile(mobile_number);
+        const mobile = normalizeMobile(req.body.mobile || req.body.mobile_number || req.body.mobileNo);
+        const password = req.body.password || "";
 
-        const existing = await User.findOne({ $or: [{ email: normalizedEmail }, { mobile_number: normalizedMobile }] });
-        if (existing) return res.status(400).json({ success: false, message: "Email or mobile already in use" });
+        if (!mobile || !password) return res.status(400).json({ status: "false", success: false, message: "Mobile credentials missing." });
 
-        const user = await User.create({
-            first_name, last_name, name: `${first_name} ${last_name || ""}`.trim(),
-            email: normalizedEmail, mobile_number: normalizedMobile,
-            password, user_type: Number(user_type),
-            temple_id: Number(user_type) === 2 ? temple_id : null,
-            is_verified: true // Admin usually auto-verified
-        });
+        const user = await User.findOne({ mobile_number: mobile });
+        
+        if (!user || !user.is_verified || !(await user.matchPassword(password))) {
+            return res.status(401).json({ status: "false", success: false, message: "Invalid phone number or password." });
+        }
+
+        // 🚨 Failsafe Shield
+        const type = Number(user.user_type);
+        if (type === 1 || type === 2 || user.role === 'admin' || user.role === 'temple_admin') {
+            return res.status(403).json({ status: "false", success: false, message: "Access Denied: Admin credentials cannot be used on the App." });
+        }
 
         const token = generateAccessToken(user);
-        return res.status(201).json({
-            success: true, token,
-            user: { id: user._id, name: user.first_name, email: user.email, user_type: user.user_type },
-            redirectPath: user.user_type === 1 ? "/admin/dashboard" : "/temple-admin/dashboard"
+
+        return res.status(200).json({
+            status: "true", success: true, message: "Mobile Session Activated Successfully",
+            token: token,
+            data: { ...serializeUserBase(user), access_token: token, accessToken: token }
         });
     } catch (error) {
-        if (handleDuplicateKeyError(error, res)) return;
-        return res.status(500).json({ success: false, message: "Admin signup failed" });
+        console.error("📱 Mobile Login Crash:", error);
+        return res.status(500).json({ status: "false", success: false, message: "Mobile authentication pipeline error." });
     }
 };
+
+exports.loginUnified = async (req, res) => {
+    try {
+        const { email, mobile_number, password } = req.body;
+        if (!password) return res.status(400).json({ status: "false", success: false, message: "Password is required." });
+
+        let query = {};
+        let isEmailLogin = false;
+
+        if (email) {
+            query.email = normalizeEmail(email);
+            isEmailLogin = true;
+        } else if (mobile_number) {
+            const cleanMobile = normalizeMobile(mobile_number);
+            if (!cleanMobile) return res.status(400).json({ status: "false", success: false, message: "Invalid mobile number format." });
+            query.mobile_number = cleanMobile;
+        } else {
+            return res.status(400).json({ status: "false", success: false, message: "Missing fields (provide email or mobile number)." });
+        }
+
+        const user = await User.findOne(query);
+        if (!user) {
+            return res.status(404).json({ status: "false", success: false, message: isEmailLogin ? "Email is not registered with us." : "Mobile number is not registered with us." });
+        }
+
+        // 🚨 Failsafe Shield
+        const type = Number(user.user_type);
+        if (type === 1 || type === 2 || user.role === 'admin' || user.role === 'temple_admin') {
+            return res.status(403).json({ status: "false", success: false, message: "Access Denied: Please use your designated Admin Portal." });
+        }
+
+        const isPasswordMatch = await user.matchPassword(password);
+        if (!isPasswordMatch) return res.status(401).json({ status: "false", success: false, message: "Incorrect password." });
+        
+        const token = generateAccessToken(user);
+        res.cookie("access_token", token, { 
+            httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: "lax", path: '/'
+        });
+        
+        return res.status(200).json({ status: "true", success: true, message: "Authentication Granted.", user: serializeUserBase(user) });
+
+    } catch (error) {
+        console.error("Unified Login System Fault:", error);
+        return res.status(500).json({ status: "false", success: false, message: "Server encountered an error." });
+    }
+};
+
+// =========================================================================
+// 🔄 5. SESSION & STATE MANAGEMENT
+// =========================================================================
 
 exports.refreshAccessToken = async (req, res) => {
     try {
-        return res.status(200).json({ status: "true", success: true, message: "Token valid", data: [] });
+        return res.status(200).json({ status: "true", success: true, message: "Token synchronization success.", data: [] });
     } catch (error) {
         return res.status(500).json({ status: "false", success: false, message: error.message });
     }
@@ -360,10 +495,10 @@ exports.refreshAccessToken = async (req, res) => {
 exports.checkAuth = async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select("-password");
-        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        if (!user) return res.status(404).json({ success: false, message: "User session profile missing" });
         return res.status(200).json({ success: true, user });
     } catch (error) {
-        return res.status(500).json({ success: false, message: "Server Error" });
+        return res.status(500).json({ success: false, message: "Identity validation error" });
     }
 };
 
@@ -375,20 +510,16 @@ exports.logout = async (req, res) => {
             sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
             path: "/"
         });
-
-        return res.status(200).json({
-            status: "true",
-            success: true,
-            message: "Logged out"
-        });
+        return res.status(200).json({ status: "true", success: true, message: "Session tokens cleared successfully." });
     } catch (error) {
-        return res.status(500).json({
-            status: "false",
-            success: false,
-            message: "Logout error"
-        });
+        return res.status(500).json({ status: "false", success: false, message: "Logout runtime fault." });
     }
 };
+
+// =========================================================================
+// ⏳ 6. EXPORTS
+// =========================================================================
+exports.login = exports.loginUnified;
 
 module.exports = {
     signUp: exports.signUp,
@@ -397,9 +528,10 @@ module.exports = {
     forgotVerifyOtp: exports.forgotVerifyOtp,
     forgotPassword: exports.forgotPassword,
     resetPassword: exports.resetPassword,
+    loginWeb: exports.loginWeb,
+    loginMobile: exports.loginMobile,
     login: exports.login,
     logout: exports.logout,
-    adminSignup: exports.adminSignup,
     refreshAccessToken: exports.refreshAccessToken,
     checkAuth: exports.checkAuth
 };

@@ -5,8 +5,16 @@ const User = require("../../models/User");
 const RitualBooking = require("../../models/RitualBooking");
 
 /**
+ * @desc Web-specific wrapper for About Page Data
+ * @route GET /about-data
+ */
+exports.getWebAboutData = async (req, res) => {
+  // This calls the logic below, ensuring route compatibility
+  return await exports.getAboutPageData(req, res);
+};
+
+/**
  * @desc Get all data required for the rich About page
- * @route GET /api/v1/about-data
  */
 exports.getAboutPageData = async (req, res) => {
   try {
@@ -76,7 +84,6 @@ exports.getAboutPageData = async (req, res) => {
 
 /**
  * @desc Get simple About Us content for Flutter app
- * @route GET /api/v1/about-us
  */
 exports.getAboutUs = async (req, res) => {
   try {
@@ -84,14 +91,10 @@ exports.getAboutUs = async (req, res) => {
       status: "true",
       message: "About us information retrieved successfully.",
       data: {
-        about:
-          "Sarvatirthamayi is a spiritual platform dedicated to connecting devotees with temples, rituals, sacred journeys, and devotional services through a seamless digital experience.",
-        vision:
-          "To make divine experiences accessible to every devotee by bringing temples, rituals, and spiritual services onto one trusted technology platform.",
-        mission:
-          "Our mission is to provide reliable temple services, ritual booking, donations, memberships, and devotional support with simplicity, trust, and devotion.",
-        team:
-          "Our team is committed to serving devotees with faith, dedication, and technical excellence to build a spiritually meaningful and user-friendly ecosystem.",
+        about: "Sarvatirthamayi is a spiritual platform dedicated to connecting devotees with temples, rituals, sacred journeys, and devotional services through a seamless digital experience.",
+        vision: "To make divine experiences accessible to every devotee by bringing temples, rituals, and spiritual services onto one trusted technology platform.",
+        mission: "Our mission is to provide reliable temple services, ritual booking, donations, memberships, and devotional support with simplicity, trust, and devotion.",
+        team: "Our team is committed to serving devotees with faith, dedication, and technical excellence to build a spiritually meaningful and user-friendly ecosystem.",
       },
     });
   } catch (error) {

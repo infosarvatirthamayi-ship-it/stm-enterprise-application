@@ -1,11 +1,12 @@
 const express = require("express");
 const router = express.Router();
 
+
 // --- Controllers ---
 const aboutController = require("../controllers/user/aboutController");
-//const joinNowController = require("../controllers/user/join-nowController");
 const joinNowController = require("../controllers/user/joinNowController");
-const userController = require("../controllers/user/userController");
+// 🎯 CORRECT: Imported as usersController
+const usersController = require("../controllers/user/usersController");
 const templeBookingController = require("../controllers/user/templeBookingController");
 const ritualController = require("../controllers/user/ritualController");
 const homeController = require("../controllers/user/homeController");
@@ -20,26 +21,41 @@ const offerController = require("../controllers/user/offerController");
 const userCardController = require('../controllers/user/userCardController');
 const userVoucherController = require('../controllers/user/userVoucherController');
 const { 
-  getActiveMemberships, 
-  purchaseMembershipCard, 
-  verifyMembershipPayment, 
-  getMyMembershipCard 
+  getActiveMemberships, 
+  purchaseMembershipCard, 
+  verifyMembershipPayment, 
+  getMyMembershipCard 
 } = require("../controllers/user/membershipcardController");
 
 // --- Middleware ---
-const { protect } = require("../middleware/authMiddleware");
+// backend/routes/userRoutes.js
+const { protectWeb, softProtectWeb } = require("../middleware/authMiddleware");
 const upload = require("../middleware/uploadMiddleware");
 
-// Helper: Multipart Handler
 const handleProfileUploads = (req, res, next) => {
-  const uploadFields = upload.fields([
-    { name: "profile_picture", maxCount: 1 },
-    { name: "banner_image", maxCount: 1 },
-  ]);
-  uploadFields(req, res, (err) => {
-    if (err) return res.status(400).json({ status: "false", success: false, message: err.message });
-    next();
-  });
+  const uploadFields = upload.fields([
+    { name: "profile_picture", maxCount: 1 },
+    { name: "banner_image", maxCount: 1 },
+  ]);
+  uploadFields(req, res, (err) => {
+    if (err) return res.status(400).json({ status: "false", success: false, message: err.message });
+    next();
+  });
+};
+
+// ==============================================================================
+// 🛡️ THE FAILSAFE WRAPPER 
+// This prevents the server from crashing if a controller function is missing.
+// ==============================================================================
+const safeRoute = (controllerFunction) => {
+    if (typeof controllerFunction === 'function') {
+        return controllerFunction;
+    } else {
+        return (req, res) => res.status(501).json({ 
+            success: false, 
+            message: "Endpoint under construction. Controller function is missing or not exported." 
+        });
+    }
 };
 
 // --- Routes ---
@@ -48,80 +64,95 @@ const handleProfileUploads = (req, res, next) => {
 router.get("/test-route", (req, res) => res.json({ message: "User router is working!" }));
 
 // Authentication
-router.post("/signup", userController.signupUser);
-router.post("/verify-otp", userController.verifyOtp);
-router.post("/resend-otp", userController.resendOtp);
-router.post("/login", userController.loginUser);
-router.post("/logout", protect, userController.logoutUser);
-router.post("/forgot-password", userController.forgotPassword);
-router.post("/reset-password", userController.resetPassword);
+// 🎯 FIX: Changed userController to usersController
+router.post("/signup", safeRoute(usersController.signupUser));
+router.post("/verify-otp", safeRoute(usersController.verifyOtp));
+router.post("/resend-otp", safeRoute(usersController.resendOtp));
+router.post("/login", safeRoute(usersController.loginUser));
+router.post("/logout", protectWeb, safeRoute(usersController.logoutUser));
+router.post("/forgot-password", safeRoute(usersController.forgotPassword));
+router.post("/forgot-verify-otp", safeRoute(usersController.forgotVerifyOtp));
+router.post("/reset-password", safeRoute(usersController.resetPassword));
 
 // Public / Basic Data
-router.post("/contact-us", contactController.contactUs);
-router.get("/about-data", aboutController.getAboutPageData);
-router.get("/about-us", aboutController.getAboutUs);
-router.get("/privacy-policy", privacyController.getPrivacyPolicy);
-router.get("/term-condition", termsController.getTermsAndConditions);
-router.get("/states", joinNowController.getPublicStates);
+router.post("/contact-us", safeRoute(contactController.contactUs));
+router.get("/about-data", safeRoute(aboutController.getAboutPageData));
+router.get("/about-us", safeRoute(aboutController.getAboutUs));
+router.get("/privacy-policy", safeRoute(privacyController.getPrivacyPolicy));
+router.get("/term-condition", safeRoute(termsController.getTermsAndConditions));
+router.get("/states", safeRoute(joinNowController.getPublicStates));
+
 
 // Home & Profile
-router.get("/home", protect, homeController.getHomeData);
-router.get("/auth/check-auth", protect, (req, res) => res.status(200).json({ success: true, user: req.user }));
-router.get("/profile", protect, userController.getProfile);
-router.post("/profile", protect, handleProfileUploads, userController.updateProfile);
-router.put("/profile", protect, handleProfileUploads, userController.updateProfile);
-router.put("/update-profile", protect, handleProfileUploads, userController.updateProfile);
+router.get("/home", protectWeb, safeRoute(homeController.getHomeData));
+
+// 🎯 The flawless check-auth route
+router.get("/check-auth", softProtectWeb, (req, res) => {
+  if (req.user) {
+    return res.status(200).json({ success: true, user: req.user });
+  } else {
+    // 🎯 Return 200 OK, but clearly state it's a guest
+    return res.status(200).json({ success: true, user: null, isGuest: true });
+  }
+});
+
+// 🎯 FIX: Changed userController to usersController
+router.get("/profile", protectWeb, safeRoute(usersController.getProfile));
+router.post("/profile", protectWeb, handleProfileUploads, safeRoute(usersController.updateProfile));
+router.put("/profile", protectWeb, handleProfileUploads, safeRoute(usersController.updateProfile));
+router.put("/update-profile", protectWeb, handleProfileUploads, safeRoute(usersController.updateProfile));
+router.get("/temple-assistants/:templeId", safeRoute(usersController.getAssistantsByTemple));
+
 
 // Membership, Cards & Vouchers
-router.get("/membership-card/index", protect, getActiveMemberships);
-router.post("/membership-card/purchase", protect, purchaseMembershipCard);
-router.post("/membership-card/verify-payment", protect, verifyMembershipPayment);
-router.get("/membership-card/my-card", protect, getMyMembershipCard);
-router.get("/membership-plans/active", getActiveMemberships);
-router.get("/card/my-card", protect, userCardController.getMyCard); // 🎯 Explicit Card Route
-router.post("/vouchers/verify", protect, userVoucherController.verifyVoucherForUser);
-router.get("/vouchers/available", protect, userVoucherController.getAvailableVouchers);
+router.get("/membership-card/index", protectWeb, safeRoute(getActiveMemberships));
+router.post("/membership-card/purchase", protectWeb, safeRoute(purchaseMembershipCard));
+router.post("/membership-card/verify-payment", protectWeb, safeRoute(verifyMembershipPayment));
+router.get("/membership-card/my-card", protectWeb, safeRoute(getMyMembershipCard));
+router.get("/membership-plans/active", safeRoute(getActiveMemberships));
+router.get("/card/my-card", protectWeb, safeRoute(userCardController.getMyCard)); 
+router.post("/vouchers/verify", protectWeb, safeRoute(userVoucherController.verifyVoucherForUser));
+router.get("/vouchers/available", protectWeb, safeRoute(userVoucherController.getAvailableVouchers));
 
-// Temples, Rituals, Donations
-router.get("/temple/index", joinNowController.getPublicTemples);
-router.post("/temple/show", joinNowController.getPublicTempleById);
-router.get("/temples", joinNowController.getPublicTemples);
-router.get("/temples/:id", joinNowController.getPublicTempleById);
-router.get("/temple-assistants/:templeId", userController.getAssistantsByTemple);
-router.post("/temple/booking", protect, templeBookingController.createTempleBookingOrder);
-router.post("/temple/verify-payment", protect, templeBookingController.verifyAndConfirmBooking);
-router.get("/temple/booking-details", protect, templeBookingController.getMyBookings);
+// Temples, Rituals, Donations (ALL WRAPPED SAFELY)
+router.get("/temple/index", safeRoute(joinNowController.getPublicTemples));
+router.post("/temple/show", safeRoute(joinNowController.getPublicTempleById));
+router.get("/temples", safeRoute(joinNowController.getPublicTemples));
+router.get("/temples/:id", safeRoute(joinNowController.getPublicTempleById));
+
+router.post("/temple/booking", protectWeb, safeRoute(templeBookingController.createTempleBookingOrder));
+router.post("/temple/verify-payment", protectWeb, safeRoute(templeBookingController.verifyAndConfirmBooking));
+router.get("/temple/booking-details", protectWeb, safeRoute(templeBookingController.getMyBookings));
  
-router.get("/rituals", ritualController.getAllRituals);
-router.post("/ritual/index", protect, ritualController.getRitualsByTemple);
-router.post("/ritual/show", protect, ritualController.getRitualShow);
-router.post("/ritual/packages", protect, ritualController.getRitualPackages);
-router.post("/ritual/booking", protect, ritualController.createRitualOrder);
-router.post("/ritual/verify-payment", protect, ritualController.verifyRitualBooking);
-router.get("/ritual/booking-details", protect, ritualController.getMyRitualBookings);
+router.get("/rituals", safeRoute(ritualController.getAllRituals));
+router.post("/ritual/index", protectWeb, safeRoute(ritualController.getRitualsByTemple));
+router.post("/ritual/show", protectWeb, safeRoute(ritualController.getRitualShow));
+router.post("/ritual/packages", protectWeb, safeRoute(ritualController.getRitualPackages));
+router.post("/ritual/booking", protectWeb, safeRoute(ritualController.createRitualOrder));
+router.post("/ritual/verify-payment", protectWeb, safeRoute(ritualController.verifyRitualBooking));
+router.get("/ritual/booking-details", protectWeb, safeRoute(ritualController.getMyRitualBookings));
 
-router.post("/donation/index", protect, donationController.getDonations);
-router.post("/donation/show", protect, donationController.getDonationById);
-router.post("/donation/update", protect, upload.single("image"), donationController.updateDonation);
-router.get("/donation/booking-details", protect, donationController.getMyDonationBookings);
+router.post("/donation/index", protectWeb, safeRoute(donationController.getDonations));
+router.post("/donation/show", protectWeb, safeRoute(donationController.getDonationById));
+router.post("/donation/update", protectWeb, upload.single("image"), safeRoute(donationController.updateDonation));
+router.get("/donation/booking-details", protectWeb, safeRoute(donationController.getMyDonationBookings));
 
-// Offer Zone & Favourites
-router.get("/offers", protect, offerController.getOffers);
-router.get("/offer/index", protect, offerController.getOffers);
-router.post("/offer/show", protect, offerController.getOfferById);
-router.get("/offers/:id", protect, offerController.getOfferById);
-router.post("/favourite", protect, favouriteController.favourite);
-router.post("/favorite", protect, favouriteController.favourite);
-router.get("/favourite/index", protect, favouriteController.favouriteGet);
-router.get("/favorite/index", protect, favouriteController.favouriteGet);
-router.get("/favorite/list", protect, favouriteController.favouriteGet);
+// Offers & Favourites
+router.get("/offers", protectWeb, safeRoute(offerController.getOffers));
+router.get("/offer/index", protectWeb, safeRoute(offerController.getOffers));
+router.post("/offer/show", protectWeb, safeRoute(offerController.getOfferById));
+router.get("/offers/:id", protectWeb, safeRoute(offerController.getOfferById));
+router.post("/favourite", protectWeb, safeRoute(favouriteController.favourite));
+router.post("/favorite", protectWeb, safeRoute(favouriteController.favourite));
+router.get("/favourite/index", protectWeb, safeRoute(favouriteController.favouriteGet));
+router.get("/favorite/index", protectWeb, safeRoute(favouriteController.favouriteGet));
+router.get("/favorite/list", protectWeb, safeRoute(favouriteController.favouriteGet));
 
 // Legacy Compatibility
-router.post("/book-temple/create-order", protect, templeBookingController.createTempleBookingOrder);
-router.post("/book-temple/verify", protect, templeBookingController.verifyAndConfirmBooking);
-router.get("/my-temple-bookings", protect, templeBookingController.getMyBookings);
-router.post("/rituals/create-order", protect, ritualController.createRitualOrder);
-router.post("/rituals/verify-booking", protect, ritualController.verifyRitualBooking);
+router.post("/book-temple/create-order", protectWeb, safeRoute(templeBookingController.createTempleBookingOrder));
+router.post("/book-temple/verify", protectWeb, safeRoute(templeBookingController.verifyAndConfirmBooking));
+router.get("/my-temple-bookings", protectWeb, safeRoute(templeBookingController.getMyBookings));
+router.post("/rituals/create-order", protectWeb, safeRoute(ritualController.createRitualOrder));
+router.post("/rituals/verify-booking", protectWeb, safeRoute(ritualController.verifyRitualBooking));
 
 module.exports = router;
-

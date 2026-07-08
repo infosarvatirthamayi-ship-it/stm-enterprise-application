@@ -11,7 +11,9 @@ router.post('/logout', authController.logout);             // Added for Cookie c
 // 2. Registration & OTP
 router.post('/signup', authController.signUp);       
 router.post('/verify-otp', authController.verifyOtp);
-router.post('/admin/signup', authController.adminSignup);
+
+//router.post('/admin/signup', authController.adminSignup);
+
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 router.post('/resend-otp', authController.resendOtp);

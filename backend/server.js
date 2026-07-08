@@ -139,7 +139,8 @@ mongoose.connect(process.env.MONGO_URI, { autoIndex: true })
 
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server Live: http://0.0.0.0:${PORT} | BFF Mode Active`);
+    //console.log(`🚀 Server Live: http://0.0.0.0:${PORT} | BFF Mode Active`);
+    console.log("🚀 CI/CD Automated Deployment is LIVE!");
 });
 
 // =========================================================================

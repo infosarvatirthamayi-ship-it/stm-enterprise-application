@@ -19,3 +19,8 @@ jobs:
             git pull origin main
             npm install
             pm2 restart all
+            # 2. Update Frontend
+            cd /var/www/sarvatirthamayi_site/frontend
+            git pull origin main
+            npm install
+            npm run build

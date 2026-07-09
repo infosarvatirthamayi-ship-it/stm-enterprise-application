@@ -23,7 +23,9 @@ export const TempleAdminAuthProvider = ({ children }) => {
       const data = res?.user || res?.data || null;
       
       if (data && Number(data.user_type) !== 2) {
-        throw new Error("Unauthorized portal access");
+        // 🛡️ FIXED: Fail silently instead of throwing a fatal error
+        setTempleAdmin(null);
+        return null;
       }
       
       setTempleAdmin(data);
@@ -43,7 +45,8 @@ export const TempleAdminAuthProvider = ({ children }) => {
       await refreshTempleAdmin();
       setLoading(false);
     };
-    init();
+    //init();
+    setLoading(false);
   }, [refreshTempleAdmin]);
 
   const login = useCallback(async (credentials) => {

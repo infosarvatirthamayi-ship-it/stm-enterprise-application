@@ -20,7 +20,8 @@ export const UserAuthProvider = ({ children }) => {
       // 🛡️ PRO ERROR HANDLING: Silent fail for check-auth on network drops
       if (!err.response) {
         console.warn("⚠️ Backend unreachable. Operating in offline/guest mode.");
-      } else {
+      } else if (err.response.status !== 401) {
+        // 🛡️ FIXED: Only print a warning if the error is NOT a standard 401 unauthenticated guest
         console.warn("⚠️ Auth Check Failed:", err.response?.data?.message || err.message);
       }
       setUser(null);

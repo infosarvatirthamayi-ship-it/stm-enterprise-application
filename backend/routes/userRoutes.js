@@ -1,7 +1,5 @@
 const express = require("express");
 const router = express.Router();
-
-
 // --- Controllers ---
 const aboutController = require("../controllers/user/aboutController");
 const joinNowController = require("../controllers/user/joinNowController");
@@ -9,6 +7,7 @@ const joinNowController = require("../controllers/user/joinNowController");
 const usersController = require("../controllers/user/usersController");
 const templeBookingController = require("../controllers/user/templeBookingController");
 const ritualController = require("../controllers/user/ritualController");
+
 const homeController = require("../controllers/user/homeController");
 const donationController = require("../controllers/user/donationController");
 const contactController = require("../controllers/user/contactController");
@@ -123,7 +122,7 @@ router.get("/temples/:id", safeRoute(joinNowController.getPublicTempleById));
 router.post("/temple/booking", protectWeb, safeRoute(templeBookingController.createTempleBookingOrder));
 router.post("/temple/verify-payment", protectWeb, safeRoute(templeBookingController.verifyAndConfirmBooking));
 router.get("/temple/booking-details", protectWeb, safeRoute(templeBookingController.getMyBookings));
- 
+
 router.get("/rituals", safeRoute(ritualController.getAllRituals));
 router.post("/ritual/index", protectWeb, safeRoute(ritualController.getRitualsByTemple));
 router.post("/ritual/show", protectWeb, safeRoute(ritualController.getRitualShow));

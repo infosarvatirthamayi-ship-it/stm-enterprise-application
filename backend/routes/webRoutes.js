@@ -21,6 +21,11 @@ const membershipWebController = require('../controllers/web/membershipWebControl
 const webProfileController = require('../controllers/web/webProfileController');
 const webBookingController = require('../controllers/web/templeBookingWebController');
 
+const { 
+    initiateTempleBooking, 
+    verifyTempleBooking 
+} = require("../controllers/user/userTempleBookingController");
+
 // --- 2. Keep Shared/Global Controllers ---
 // 🎯 FIX: Updated to usersController
 const usersController = require('../controllers/user/usersController'); 
@@ -102,6 +107,9 @@ router.put(
 );
 
 router.get('/user/my-temple-bookings', protectWeb, webProfileController.getMyWebBookings);
+
+router.post('/user/temple-booking/initiate', protectWeb, initiateTempleBooking);
+router.post('/user/temple-booking/verify', protectWeb, verifyTempleBooking);
 
 router.post('/temples/:templeId/book', protectWeb, webBookingController.initiateTempleBooking);
 router.post('/temples/verify-booking', protectWeb, webBookingController.verifyTempleBooking);

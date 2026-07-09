@@ -75,7 +75,7 @@ export default function BookingForm() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const tempRes = await api.get(`/user/temples/${id}`);
+        const tempRes = await api.get(`/web/temples/${id}`);
         setTemple(tempRes.data?.data || tempRes.data);
         setFormData(prev => ({
           ...prev,

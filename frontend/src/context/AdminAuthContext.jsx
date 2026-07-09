@@ -23,7 +23,9 @@ export const AdminAuthProvider = ({ children }) => {
       const adminData = res?.user || res?.data || null;
       
       if (adminData && Number(adminData.user_type) !== 1) {
-        throw new Error("Unauthorized portal access");
+        // 🛡️ FIXED: Fail silently instead of throwing a fatal error
+        setAdmin(null);
+        return null;
       }
       
       setAdmin(adminData);

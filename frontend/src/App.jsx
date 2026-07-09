@@ -10,10 +10,10 @@ import { TempleAdminAuthProvider } from "./context/TempleAdminAuthContext";
 // Global Components
 import Navbar from "./components/Navbar";
 
-// Layered System Routes
+// Layered System Routes (Ensure these are exported as components, e.g., export const UserRoutes = () => { ... })
 import { UserRoutes } from "./routes/UserRoutes";
 import { AdminRoutes } from "./routes/AdminRoutes";
-import { TempleAdminRoutes } from "./routes/TempleAdminRoutes"; // 🎯 Imported the modular temple route tree!
+import { TempleAdminRoutes } from "./routes/TempleAdminRoutes"; 
 
 // Authentication Panel Points
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -21,60 +21,69 @@ import ForgotPassword from "./pages/admin/ForgotPassword";
 import ResetPassword from "./pages/admin/ResetPassword";
 import TempleAdminLogin from "./pages/temple-admin/TempleAdminLogin"; 
 
-
 export default function App() {
   const location = useLocation();
 
+  // Route checking for Navbar visibility
   const authPaths = [
     "/user/login",
     "/signup",
     "/verify-otp",
     "/user/forgot-password",
-    "/admin/login",
-    "/temple-admin/login",
   ];
-
+  
   const isAdminArea = location.pathname.startsWith("/admin") || location.pathname.startsWith("/temple-admin");
   const showNavbar = !authPaths.includes(location.pathname) && !isAdminArea;
 
   return (
-    <UserAuthProvider>
-      <AdminAuthProvider>
-        <TempleAdminAuthProvider>
-          
-          <Toaster position="top-right" reverseOrder={false} />
-          {showNavbar && <Navbar />}
+    <>
+      <Toaster position="top-right" reverseOrder={false} />
 
-          <Routes>
-            {/* ==========================================
-                🙏 USER ZONE
-                ========================================== */}
-            <Route path="/*" element={<UserRoutes />} />
+      <Routes>
+        {/* ==========================================
+            🙏 USER ZONE (Isolated Auth)
+            Only checks User Auth. Navbar is inside so it can access useUserAuth!
+            ========================================== */}
+        <Route path="/*" element={
+          <UserAuthProvider>
+            {showNavbar && <Navbar />}
+            <UserRoutes />
+          </UserAuthProvider>
+        } />
 
-            {/* ==========================================
-                🛡️ CORE SYSTEM ADMIN ZONE
-                ========================================== */}
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/forgot-password" element={<ForgotPassword />} />
-            <Route path="/admin/reset-password/:token" element={<ResetPassword />} />
-            
-            {/* Mount core dashboard and office systems */}
-            {AdminRoutes}
+        {/* ==========================================
+            🛡️ CORE SYSTEM ADMIN ZONE (Isolated Auth)
+            Only checks Admin Auth if the URL starts with /admin
+            ========================================== */}
+        <Route path="/admin/*" element={
+          <AdminAuthProvider>
+            <Routes>
+              <Route path="login" element={<AdminLogin />} />
+              <Route path="forgot-password" element={<ForgotPassword />} />
+              <Route path="reset-password/:token" element={<ResetPassword />} />
+              
+              {/* Catch all other /admin/... paths and send to AdminRoutes component */}
+              <Route path="*" element={<AdminRoutes />} />
+            </Routes>
+          </AdminAuthProvider>
+        } />
 
-            {/* ==========================================
-                🛕 TEMPLE AUTHORITY OPERATIONAL ZONE
-                ========================================== */}
-            <Route path="/temple-admin/login" element={<TempleAdminLogin />} />
-            
-            {/* 🎯 Un-noted & mounted cleanly: Diverting all operations to the new route tree */}
-            {TempleAdminRoutes}
+        {/* ==========================================
+            🛕 TEMPLE AUTHORITY OPERATIONAL ZONE (Isolated Auth)
+            Only checks Temple Admin Auth if URL starts with /temple-admin
+            ========================================== */}
+        <Route path="/temple-admin/*" element={
+          <TempleAdminAuthProvider>
+            <Routes>
+              <Route path="login" element={<TempleAdminLogin />} />
+              
+              {/* Catch all other /temple-admin/... paths and send to TempleAdminRoutes */}
+              <Route path="*" element={<TempleAdminRoutes />} />
+            </Routes>
+          </TempleAdminAuthProvider>
+        } />
 
-            {/* Global Unknown Fallback Security Catch */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-          
-        </TempleAdminAuthProvider>
-      </AdminAuthProvider>
-    </UserAuthProvider>
+      </Routes>
+    </>
   );
 }

@@ -41,11 +41,8 @@ exports.getWebTemples = async (req, res) => {
         const { stateName, search, page = 1, per_page = 15 } = req.query;
         const query = buildTempleQuery(stateName, search);
         
-        const temples = await Temple.find(query)
-            .sort({ sequence: 1 })
-            .skip((page - 1) * per_page)
-            .limit(parseInt(per_page))
-            .lean();
+        // 🚀 THE FIX: Chained entirely on one clean line to avoid invisible line-break characters
+        const temples = await Temple.find(query).sort({ sequence: 1 }).skip((page - 1) * per_page).limit(parseInt(per_page)).lean();
         
         const authUserSqlId = await getAuthUserSqlId(req);
         const favorites = authUserSqlId > 0 ? await Favorite.find({ user_id: authUserSqlId, type: 1 }).lean() : [];

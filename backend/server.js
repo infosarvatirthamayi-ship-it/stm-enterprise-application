@@ -148,12 +148,17 @@ const server = app.listen(PORT, "0.0.0.0", () => {
 // =========================================================================
 const gracefulShutdown = () => {
     console.log("\n⚠️ Shutting down gracefully...");
-    server.close(() => {
+    server.close(async () => {
         console.log("🔌 HTTP Server closed.");
-        mongoose.connection.close(false, () => {
+        try {
+            // THE FIX: Modern Promise-based Mongoose connection close
+            await mongoose.connection.close(false);
             console.log("💾 MongoDB connection closed.");
             process.exit(0);
-        });
+        } catch (err) {
+            console.error("❌ Database shutdown error:", err);
+            process.exit(1);
+        }
     });
 };
 

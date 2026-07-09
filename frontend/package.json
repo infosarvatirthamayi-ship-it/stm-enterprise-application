@@ -16,7 +16,7 @@
     "axios": "^1.6.7",
     "framer-motion": "^12.31.0",
     "html2canvas": "^1.4.1",
-    "lucide-react": "^0.562.0",
+    "lucide-react": "^1.23.0",
     "multer": "^2.0.2",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",

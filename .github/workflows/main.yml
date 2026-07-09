@@ -1,4 +1,4 @@
-name: Deploy Backend
+name: Deploy Full Stack
 on:
   push:
     branches:
@@ -15,12 +15,18 @@ jobs:
           username: ${{ secrets.PROD_SERVER_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
-            cd /var/www/sarvatirthamayi_site/backend
-            git pull origin main
-            npm install
-            pm2 restart all
-            # 2. Update Frontend
+            # 1. Update and Build Frontend
+            echo "📦 Pulling and Building Frontend..."
             cd /var/www/sarvatirthamayi_site/frontend
             git pull origin main
             npm install
             npm run build
+
+            # 2. Update and Restart Backend
+            echo "⚙️ Pulling and Restarting Backend..."
+            cd /var/www/sarvatirthamayi_site/backend
+            git pull origin main
+            npm install
+            pm2 restart all
+
+            echo "✅ Deployment Completely Successful!"

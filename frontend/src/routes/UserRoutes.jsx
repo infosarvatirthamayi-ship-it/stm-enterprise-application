@@ -76,11 +76,11 @@ export function UserRoutes() {
         </UserProtectedRoute>
       } />
 
-      <Route path="/membership-success" element={
-        <UserProtectedRoute allowedTypes={[3]}>
-          <MembershipSuccess />
-        </UserProtectedRoute>
-      } />
+      <Route path="/membership-card" element={
+  <UserProtectedRoute allowedTypes={[3]}>
+    <MembershipSuccess />
+  </UserProtectedRoute>
+} />
       
       <Route path="/join-club/:id" element={
         <UserProtectedRoute allowedTypes={[3]}>

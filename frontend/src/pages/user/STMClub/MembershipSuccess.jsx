@@ -3,12 +3,13 @@ import React, { useRef, useEffect, useState } from "react";
 import { useUserAuth } from "../../../context/UserAuthContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Download, CheckCircle2, Home, Star, Loader2, Fingerprint } from "lucide-react";
+import { Download, CheckCircle2, Home, Loader2, Fingerprint } from "lucide-react";
 import { motion } from "framer-motion";
 import html2canvas from "html2canvas";
 import api from "../../../api/api";
 import { getFullImageUrl } from "../../../utils/config";
 import { toast, Toaster } from "react-hot-toast";
+import { QRCodeSVG } from "qrcode.react"; // 🎯 NEW: QR Code Engine
 
 export default function MembershipSuccess() {
   const { user } = useUserAuth();
@@ -67,6 +68,11 @@ export default function MembershipSuccess() {
     </div>
   );
 
+  // Fallback ID if loading is weird
+  const digitalId = cardData?.membership_card_id || cardData?._id || "PENDING";
+  // The exact URL your staff will scan
+  const verificationUrl = `https://sarvatirthamayi.com/verify/${digitalId}`;
+
   return (
     <div className={`min-h-screen pt-24 pb-20 flex flex-col items-center px-4 transition-colors duration-500 ${dark ? 'bg-[#0a0a1a] text-white' : 'bg-slate-50 text-slate-900'}`}>
       <Toaster position="top-center" />
@@ -106,11 +112,21 @@ export default function MembershipSuccess() {
                 <p className="text-[8px] text-purple-400 font-bold uppercase tracking-[0.3em] mt-0.5">Premium Legacy</p>
               </div>
             </div>
-            <Star size={20} className="text-amber-400 filter drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]" fill="currentColor" />
+            
+            {/* 🎯 NEW: Interactive Dynamic QR Code */}
+            <div className="bg-white/10 p-1.5 rounded-xl backdrop-blur-md border border-white/20 shadow-lg">
+              <QRCodeSVG 
+                value={verificationUrl} 
+                size={55} 
+                bgColor={"transparent"} 
+                fgColor={"#ffffff"} 
+                level={"H"} // High error correction so it scans easily even on screens
+              />
+            </div>
           </div>
 
           {/* Body */}
-          <div className="relative z-10 mt-6">
+          <div className="relative z-10 mt-2">
             <p className="text-[9px] uppercase tracking-[0.3em] font-bold text-white/40 mb-1.5 flex items-center gap-1.5">
               <Fingerprint size={12} className="text-purple-400" /> Cardholder
             </p>
@@ -118,11 +134,11 @@ export default function MembershipSuccess() {
           </div>
 
           {/* Footer */}
-          <div className="flex justify-between items-end relative z-10 pt-5 border-t border-white/10">
+          <div className="flex justify-between items-end relative z-10 pt-4 border-t border-white/10">
             <div>
               <p className="text-[8px] uppercase tracking-[0.2em] font-bold text-white/40 mb-1.5">Digital ID</p>
               <p className="font-mono text-slate-200 text-[11px] tracking-widest uppercase">
-                {cardData?.membership_card_id || cardData?._id ? `STM-${String(cardData.membership_card_id || cardData._id).slice(-8).toUpperCase()}` : "STM-VAULT"}
+                {digitalId !== "PENDING" ? `STM-${String(digitalId).slice(-8).toUpperCase()}` : "STM-VAULT"}
               </p>
             </div>
             

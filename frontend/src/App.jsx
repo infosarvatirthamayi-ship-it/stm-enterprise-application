@@ -21,6 +21,7 @@ import ForgotPassword from "./pages/admin/ForgotPassword";
 import ResetPassword from "./pages/admin/ResetPassword";
 import TempleAdminLogin from "./pages/temple-admin/TempleAdminLogin"; 
 
+
 export default function App() {
   const location = useLocation();
 

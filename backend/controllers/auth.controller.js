@@ -388,12 +388,13 @@ exports.loginWeb = async (req, res) => {
         const token = generateAccessToken(user);
 
         res.cookie("access_token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-            maxAge: 30 * 24 * 60 * 60 * 1000,
-            path: "/"
-        });
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    domain: process.env.NODE_ENV === "production" ? ".sarvatirthamayi.com" : undefined,
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    path: "/"
+});
 
         return res.status(200).json({ success: true, message: "Web Portal Authentication Granted.", user: serializeUserBase(user) });
     } catch (error) {

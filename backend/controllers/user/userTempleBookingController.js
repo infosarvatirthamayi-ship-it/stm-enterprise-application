@@ -2,6 +2,7 @@
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
+const PDFDocument = require("pdfkit");
 const Temple = require("../../models/Temple");
 const TempleBooking = require("../../models/TempleBooking");
 const PurchasedMemberCard = require("../../models/PurchasedMemberCard");
@@ -263,5 +264,96 @@ exports.verifyAndConfirmBooking = async (req, res) => {
     } catch (error) {
         console.error("Verification Error:", error);
         res.status(500).json({ success: false, message: "Server error during verification" });
+    }
+};
+
+exports.downloadTicket = async (req, res) => {
+    try {
+        const bookingId = req.params.id;
+        
+        // 1. Fetch the booking and populate temple details
+        const booking = await TempleBooking.findById(bookingId).populate('templeId');
+        
+        if (!booking) {
+            return res.status(404).json({ success: false, message: "Booking not found" });
+        }
+
+        // 2. Set up the PDF response headers
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+            "Content-Disposition", 
+            `attachment; filename=Sarvatirtham_Ticket_${booking.transactionId || booking._id}.pdf`
+        );
+
+        // 3. Create the PDF Document
+        const doc = new PDFDocument({ margin: 50, size: 'A4' });
+        doc.pipe(res);
+
+        // --- DESIGNING THE TICKET ---
+        
+        // Header
+        doc.fillColor("#7c3aed")
+           .fontSize(28)
+           .text("SARVATIRTHAMAYI", { align: "center", font: "Helvetica-Bold" });
+           
+        doc.fillColor("#475569")
+           .fontSize(12)
+           .text("Official E-Ticket & Divine Pass", { align: "center", font: "Helvetica-Oblique" });
+           
+        doc.moveDown(2);
+
+        // Ticket Box
+        doc.rect(40, 150, 515, 250).strokeColor("#e2e8f0").lineWidth(2).stroke();
+        
+        // Temple Name
+        doc.fillColor("#0f172a")
+           .fontSize(20)
+           .text(booking.templeId?.name || "Temple Visit", 60, 170, { font: "Helvetica-Bold" });
+           
+        doc.moveTo(60, 200).lineTo(530, 200).strokeColor("#e2e8f0").lineWidth(1).stroke();
+
+        // Booking Details
+        doc.fontSize(12).fillColor("#64748b");
+        
+        const detailsTop = 220;
+        const col1 = 60;
+        const col2 = 300;
+
+        // Devotee Name
+        doc.text("DEVOTEE NAME", col1, detailsTop, { font: "Helvetica-Bold" });
+        doc.fillColor("#0f172a").text(booking.devoteeName || "N/A", col1, detailsTop + 15, { font: "Helvetica" });
+
+        // Visit Date
+        doc.fillColor("#64748b").text("DATE OF VISIT", col2, detailsTop, { font: "Helvetica-Bold" });
+        const visitDate = booking.visitDate ? new Date(booking.visitDate).toLocaleDateString() : "N/A";
+        doc.fillColor("#0f172a").text(visitDate, col2, detailsTop + 15, { font: "Helvetica" });
+
+        // Transaction ID
+        doc.fillColor("#64748b").text("TRANSACTION ID", col1, detailsTop + 60, { font: "Helvetica-Bold" });
+        doc.fillColor("#0f172a").text(booking.transactionId || "Pending", col1, detailsTop + 75, { font: "Helvetica" });
+
+        // Amount Paid
+        doc.fillColor("#64748b").text("AMOUNT PAID", col2, detailsTop + 60, { font: "Helvetica-Bold" });
+        doc.fillColor("#10b981").text(`Rs. ${booking.amount || 0}`, col2, detailsTop + 75, { font: "Helvetica-Bold" });
+
+        // Special Sankalpam (If any)
+        if (booking.specialWish) {
+            doc.fillColor("#64748b").text("SANKALPAM / GOTRA", col1, detailsTop + 120, { font: "Helvetica-Bold" });
+            doc.fillColor("#0f172a").text(booking.specialWish, col1, detailsTop + 135, { font: "Helvetica", width: 470 });
+        }
+
+        // Footer
+        doc.moveDown(5);
+        doc.fillColor("#94a3b8")
+           .fontSize(10)
+           .text("Please present this E-Ticket (digital or printed) at the temple entrance.", { align: "center" });
+        doc.text("May the divine blessings be with you.", { align: "center", font: "Helvetica-Oblique" });
+
+        // 4. Finalize the PDF
+        doc.end();
+
+    } catch (error) {
+        console.error("PDF Generation Error:", error);
+        res.status(500).json({ success: false, message: "Could not generate ticket" });
     }
 };

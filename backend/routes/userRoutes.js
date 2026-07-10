@@ -150,6 +150,7 @@ router.get("/favorite/list", protectWeb, safeRoute(favouriteController.favourite
 // Legacy Compatibility
 router.post("/book-temple/create-order", protectWeb, safeRoute(templeBookingController.createTempleBookingOrder));
 router.post("/book-temple/verify", protectWeb, safeRoute(templeBookingController.verifyAndConfirmBooking));
+router.get("/book-temple/ticket/:id",protectweb,safeRoute(templeBookingController.downloadTicket));
 router.get("/my-temple-bookings", protectWeb, safeRoute(templeBookingController.getMyBookings));
 router.post("/rituals/create-order", protectWeb, safeRoute(ritualController.createRitualOrder));
 router.post("/rituals/verify-booking", protectWeb, safeRoute(ritualController.verifyRitualBooking));

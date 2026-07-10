@@ -135,40 +135,62 @@ export default function BookingForm() {
     
     setSubmitting(true);
     try {
+      // Send the full form data to the backend so it creates the order properly
       const res = await api.post("/user/book-temple/create-order", { 
         templeId: id,
+        date: formData.visitDate,
+        devoteeName: formData.devoteeName,
+        whatsAppNumber: formData.whatsappNumber,
+        wish: formData.specialWish,
         voucherCode: appliedVoucher?.code 
       });
       
-      const orderData = res.data.data;
+      const paymentData = res.data.data; 
+
+      // 🚨 THE FIX: Extracting the nested keys from your specific backend structure
+      const rzpKey = paymentData?.payment?.razorpay_public_key || paymentData?.razorpay_public_key;
+      const rzpOrderId = paymentData?.payment?.razorpay_order_id || paymentData?.razorpay_order_id;
+      const actualBookingId = paymentData?.id || paymentData?.bookingId;
+
+      if (!rzpKey || !rzpOrderId) {
+        toast.error("❌ FAILURE: Backend did not return Razorpay keys.");
+        setSubmitting(false);
+        return;
+      }
+
+      // ✅ BUILD OPTIONS
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID, 
-        amount: orderData.amount,
-        name: "Sarvatirthamayi",
+        key: rzpKey, 
+        amount: finalPrice * 100, // Using the UI's calculated finalPrice in paise
+        name: "Sarvatirtham",
         description: `Temple Visit: ${temple?.name}`,
-        order_id: orderData.id,
+        order_id: rzpOrderId, 
         handler: async (response) => {
           try {
             const verifyRes = await api.post("/user/book-temple/verify", {
-              ...response,
-              bookingData: { ...formData, templeId: id, voucherCode: appliedVoucher?.code }
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              bookingId: actualBookingId
             });
-            if (verifyRes.data.success) {
-              setTicketUrl(verifyRes.data.ticketUrl);
+            if (verifyRes.data.success || verifyRes.data.status === "true") {
+              setTicketUrl(verifyRes.data.ticketUrl || "success");
               setShowSuccessView(true);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }
           } catch (vErr) {
-            toast.error("Verification failed. Check email for ticket.");
+            toast.error("Verification failed. Check your bookings.");
           }
         },
         prefill: { name: formData.devoteeName, email: user.email, contact: formData.whatsappNumber },
         theme: { color: "#7c3aed" },
         modal: { ondismiss: () => setSubmitting(false) }
       };
+      
       new window.Razorpay(options).open();
     } catch (err) {
-      toast.error("Payment setup failed.");
+      toast.error(err.response?.data?.message || "Payment setup failed.");
+      console.error("Payment Error:", err.response?.data || err);
       setSubmitting(false);
     }
   };

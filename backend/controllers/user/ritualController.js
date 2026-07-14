@@ -1,3 +1,4 @@
+// backend/controllers/user/ritualController.js
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
@@ -10,7 +11,6 @@ const User = mongoose.models.User || require("../../models/User");
 const formatImageUrl = require("../../utils/imageUrl");
 const Favorite = require("../../models/Favorite");
 
-// Standardized messages for cross-platform (Web & Flutter) compatibility
 const FLUTTER_MESSAGES = {
   ritualListSuccess: "Ritual list fetched successfully",
   ritualShowSuccess: "Ritual fetched successfully",
@@ -20,14 +20,12 @@ const FLUTTER_MESSAGES = {
   ritualBookingDetailsSuccess: "Ritual booking details fetched successfully.",
 };
 
-// Razorpay Initialization
 const getRazorpayInstance = () =>
   new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
 
-// Utility Functions
 const isValidObjectId = (value) => mongoose.isValidObjectId(value);
 
 const toNumberOrNull = (value) => {
@@ -45,28 +43,28 @@ const getSourceValue = (source, ...keys) => {
   return null;
 };
 
-const sendError = (res, statusCode, message) =>
-  res.status(statusCode).json({
-    status: "false",
-    success: false,
-    message,
-  });
-
-// Lookup Builders for Legacy ID Support
 const buildTempleAddress = (temple) => {
-  const address = temple?.address || {};
+  if (!temple) return {};
+  
+  const city = temple.city_name || temple.city || "";
+  const state = temple.state_name || temple.state || "";
+  const address1 = temple.address_line1 || "";
+  
+  // Build a clean full address string
+  const full_address = [address1, city, state].filter(Boolean).join(", ");
+
   return {
-    full_address: address.full_address || "",
-    address_line1: address.address_line1 || "",
-    address_line2: address.address_line2 || "",
-    landmark: address.landmark || "",
-    city: address.city || "",
-    state: address.state || "",
-    pincode: address.pincode || "",
-    country: address.country || "",
-    latitude: address.latitude || "",
-    longitude: address.longitude || "",
-    address_url: address.address_url || "",
+    full_address: full_address,
+    address_line1: address1,
+    address_line2: temple.address_line2 || "",
+    landmark: temple.landmark || "",
+    city: city,
+    state: state,
+    pincode: temple.pincode || "",
+    country: temple.country_name || temple.country || "India",
+    latitude: temple.location?.coordinates?.[1] || "", // Proper GeoJSON extraction
+    longitude: temple.location?.coordinates?.[0] || "",
+    address_url: temple.address_url || "",
   };
 };
 
@@ -113,11 +111,7 @@ const getAuthUserSqlId = async (req) => {
   return 0;
 };
 
-/**
- * ============================================================================
- * GET RITUALS BY TEMPLE
- * ============================================================================
- */
+// 🎯 FIX: Supports [0, 1] universally & fetches Type
 exports.getRitualsByTemple = async (req, res) => {
   try {
     const source = { ...req.query, ...req.body };
@@ -129,7 +123,8 @@ exports.getRitualsByTemple = async (req, res) => {
     const temple = await Temple.findOne(buildTempleLookup(templeId)).lean();
     if (!temple) return sendError(res, 404, "Temple not found");
 
-    const rituals = await Ritual.find({ temple_id: temple._id, status: 1 })
+    const rituals = await Ritual.find({ temple_id: temple._id, status: { $in: [0, 1] } })
+      .populate('ritual_type_id', 'name')
       .sort({ sequence: 1, created_at: -1 })
       .lean();
 
@@ -146,51 +141,38 @@ exports.getRitualsByTemple = async (req, res) => {
       favoriteSet = new Set(favoriteDocs.map((f) => Number(f.reference_id)));
     }
 
-    const formatted = rituals.map((ritual) => ({
-      id: Number(ritual.sql_id) || 0,
-      name: String(ritual.name || ""),
-      description: String(ritual.description || ""),
-      temple_id: Number(temple.sql_id) || 0,
-      temple_name: String(temple.name || ""),
-      image: formatImageUrl(ritual.image),
-      image_thumb: formatImageUrl(ritual.image),
-      devotees_booked_count: 0,
-      is_favorite: favoriteSet.has(Number(ritual.sql_id)) ? 1 : 0,
-      address: buildTempleAddress(temple),
-    }));
+    const formatted = rituals.map((ritual) => {
+      let finalName = ritual.name || "";
+      if (/^\d+$/.test(finalName.trim()) && ritual.description) finalName = ritual.description;
+
+      return {
+        id: Number(ritual.sql_id) || 0,
+        name: String(finalName),
+        description: String(ritual.description || ""),
+        type: ritual.ritual_type_id ? ritual.ritual_type_id.name : null,
+        temple_id: Number(temple.sql_id) || 0,
+        temple_name: String(temple.name || ""),
+        image: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
+        image_thumb: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
+        devotees_booked_count: 0,
+        is_favorite: favoriteSet.has(Number(ritual.sql_id)) ? 1 : 0,
+        address: buildTempleAddress(temple),
+      };
+    });
 
     return res.status(200).json({
-      status: "true",
-      success: true,
-      message: FLUTTER_MESSAGES.ritualListSuccess,
+      status: "true", success: true, message: FLUTTER_MESSAGES.ritualListSuccess,
       data: {
-        data: formatted,
-        total_count: formatted.length,
-        is_next: false,
-        is_prev: false,
-        total_pages: 1,
-        current_page: 1,
-        per_page: formatted.length,
-        from: formatted.length ? 1 : 0,
-        to: formatted.length,
-        next_page_url: null,
-        prev_page_url: null,
-        path: req.originalUrl,
-        has_pages: false,
-        links: [],
+        data: formatted, total_count: formatted.length, is_next: false, is_prev: false,
+        total_pages: 1, current_page: 1, per_page: formatted.length, from: formatted.length ? 1 : 0,
+        to: formatted.length, next_page_url: null, prev_page_url: null, path: req.originalUrl,
+        has_pages: false, links: [],
       },
     });
-  } catch (error) {
-    console.error("🔥 Ritual List Error:", error);
-    return sendError(res, 500, error.message);
-  }
+  } catch (error) { return sendError(res, 500, error.message); }
 };
 
-/**
- * ============================================================================
- * GET SINGLE RITUAL DETAILS
- * ============================================================================
- */
+// 🎯 FIX: Supports [0, 1] universally & fetches Type
 exports.getRitualShow = async (req, res) => {
   try {
     const source = { ...req.query, ...req.body };
@@ -200,21 +182,23 @@ exports.getRitualShow = async (req, res) => {
 
     if (!ritualId) return sendError(res, 400, "ritual_id is required");
 
-    const ritual = await Ritual.findOne({ ...buildRitualLookup(ritualId), status: 1 }).lean();
+    const ritual = await Ritual.findOne({ ...buildRitualLookup(ritualId), status: { $in: [0, 1] } })
+      .populate('ritual_type_id', 'name')
+      .lean();
+      
     if (!ritual) return sendError(res, 404, "Ritual not found");
 
     let temple = null;
-
     if (ritual.temple_id && mongoose.Types.ObjectId.isValid(String(ritual.temple_id))) {
-      temple = await Temple.findOne({ _id: ritual.temple_id, status: 1 }).lean();
+      temple = await Temple.findOne({ _id: ritual.temple_id, status: { $in: [0, 1] } }).lean();
     }
     if (!temple) {
       const ritualTempleSqlId = Number(ritual.temple_id || ritual.templeId || 0);
-      if (ritualTempleSqlId > 0) temple = await Temple.findOne({ sql_id: ritualTempleSqlId, status: 1 }).lean();
+      if (ritualTempleSqlId > 0) temple = await Temple.findOne({ sql_id: ritualTempleSqlId, status: { $in: [0, 1] } }).lean();
     }
     if (!temple) {
       const fallbackTempleSqlId = Number(requestedTempleId || 0);
-      if (fallbackTempleSqlId > 0) temple = await Temple.findOne({ sql_id: fallbackTempleSqlId, status: 1 }).lean();
+      if (fallbackTempleSqlId > 0) temple = await Temple.findOne({ sql_id: fallbackTempleSqlId, status: { $in: [0, 1] } }).lean();
     }
 
     const resolvedTempleId = Number(temple?.sql_id) || Number(ritual.temple_id || ritual.templeId || 0) || Number(requestedTempleId || 0) || 0;
@@ -222,53 +206,33 @@ exports.getRitualShow = async (req, res) => {
     let favouriteExists = false;
     if (userSqlId > 0) {
       favouriteExists = !!(await Favorite.exists({
-        user_id: userSqlId,
-        reference_id: Number(ritual.sql_id) || 0,
-        type: 2,
-        status: 1,
+        user_id: userSqlId, reference_id: Number(ritual.sql_id) || 0, type: 2, status: 1,
       }));
     }
 
+    let finalName = ritual.name || "";
+    if (/^\d+$/.test(finalName.trim()) && ritual.description) finalName = ritual.description;
+
     return res.status(200).json({
-      status: "true",
-      success: true,
-      message: FLUTTER_MESSAGES.ritualShowSuccess,
+      status: "true", success: true, message: FLUTTER_MESSAGES.ritualShowSuccess,
       data: {
         id: Number(ritual.sql_id) || 0,
         temple_id: resolvedTempleId,
         temple_name: String(temple?.name || ""),
-        name: String(ritual.name || ""),
+        name: String(finalName),
         description: String(ritual.description || ""),
-        image: formatImageUrl(ritual.image),
-        image_thumb: formatImageUrl(ritual.image),
+        type: ritual.ritual_type_id ? ritual.ritual_type_id.name : null,
+        image: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
+        image_thumb: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
         devotees_booked_count: 0,
         is_favorite: favouriteExists ? 1 : 0,
-        address: {
-          full_address: [temple?.address_line1, temple?.address_line2, temple?.city_name, temple?.state_name, temple?.pincode]
-            .filter((v) => v !== null && v !== undefined && String(v).trim() !== "").join(", "),
-          address_line1: String(temple?.address_line1 || ""),
-          address_line2: String(temple?.address_line2 || ""),
-          landmark: String(temple?.landmark || ""),
-          city: String(temple?.city_name || ""),
-          state: String(temple?.state_name || ""),
-          pincode: String(temple?.pincode || ""),
-          country: String(temple?.country_name || ""),
-          latitude: temple?.latitude != null ? String(temple.latitude) : "",
-          longitude: temple?.longitude != null ? String(temple.longitude) : "",
-          address_url: String(temple?.address_url || ""),
-        },
+        address: buildTempleAddress(temple)
       },
     });
-  } catch (error) {
-    return sendError(res, 500, error.message);
-  }
+  } catch (error) { return sendError(res, 500, error.message); }
 };
 
-/**
- * ============================================================================
- * GET RITUAL PACKAGES
- * ============================================================================
- */
+// 🎯 FIX: Supports [0, 1] universally
 exports.getRitualPackages = async (req, res) => {
   try {
     const source = { ...req.query, ...req.body };
@@ -276,12 +240,11 @@ exports.getRitualPackages = async (req, res) => {
 
     if (!ritualId) return sendError(res, 400, "ritual_id is required");
 
-    const ritual = await Ritual.findOne({ ...buildRitualLookup(ritualId), status: 1 }).lean();
+    const ritual = await Ritual.findOne({ ...buildRitualLookup(ritualId), status: { $in: [0, 1] } }).lean();
     if (!ritual) return sendError(res, 404, "Ritual not found");
 
-    const packages = await RitualPackage.find({ ritual_id: ritual._id, status: 1 })
-      .sort({ created_at: 1, _id: 1 })
-      .lean();
+    const packages = await RitualPackage.find({ ritual_id: ritual._id, status: { $in: [0, 1] } })
+      .sort({ created_at: 1, _id: 1 }).lean();
 
     const ritualTempleId = Number(ritual.temple_id || ritual.templeId || 0);
 
@@ -297,21 +260,11 @@ exports.getRitualPackages = async (req, res) => {
     }));
 
     return res.status(200).json({
-      status: "true",
-      success: true,
-      message: FLUTTER_MESSAGES.ritualPackageSuccess,
-      data: { data: formatted },
+      status: "true", success: true, message: FLUTTER_MESSAGES.ritualPackageSuccess, data: { data: formatted },
     });
-  } catch (error) {
-    return sendError(res, 500, error.message);
-  }
+  } catch (error) { return sendError(res, 500, error.message); }
 };
 
-/**
- * ============================================================================
- * CREATE RITUAL ORDER (RAZORPAY)
- * ============================================================================
- */
 exports.createRitualOrder = async (req, res) => {
   try {
     const source = { ...req.query, ...req.body };
@@ -374,9 +327,7 @@ exports.createRitualOrder = async (req, res) => {
     });
 
     return res.status(200).json({
-      status: "true",
-      success: true,
-      message: FLUTTER_MESSAGES.ritualBookingSuccess,
+      status: "true", success: true, message: FLUTTER_MESSAGES.ritualBookingSuccess,
       data: {
         id: Number(booking.sql_id || 0),
         user_id: 0,
@@ -399,16 +350,9 @@ exports.createRitualOrder = async (req, res) => {
         },
       },
     });
-  } catch (error) {
-    return sendError(res, 500, error.message);
-  }
+  } catch (error) { return sendError(res, 500, error.message); }
 };
 
-/**
- * ============================================================================
- * VERIFY RITUAL PAYMENT
- * ============================================================================
- */
 exports.verifyRitualBooking = async (req, res) => {
   try {
     const source = { ...req.query, ...req.body };
@@ -433,21 +377,10 @@ exports.verifyRitualBooking = async (req, res) => {
     booking.payment_date = new Date();
     await booking.save();
 
-    return res.status(200).json({
-      status: "true",
-      success: true,
-      message: FLUTTER_MESSAGES.ritualVerifySuccess,
-    });
-  } catch (error) {
-    return sendError(res, 500, error.message);
-  }
+    return res.status(200).json({ status: "true", success: true, message: FLUTTER_MESSAGES.ritualVerifySuccess });
+  } catch (error) { return sendError(res, 500, error.message); }
 };
 
-/**
- * ============================================================================
- * GET MY BOOKINGS
- * ============================================================================
- */
 exports.getMyRitualBookings = async (req, res) => {
   try {
     const bookings = await RitualBooking.find({ user_id: req.user.id })
@@ -471,33 +404,21 @@ exports.getMyRitualBookings = async (req, res) => {
       } : null,
     }));
 
-    return res.status(200).json({
-      status: "true",
-      success: true,
-      message: FLUTTER_MESSAGES.ritualBookingDetailsSuccess,
-      data: { data: formatted },
-    });
-  } catch (error) {
-    return sendError(res, 500, error.message);
-  }
+    return res.status(200).json({ status: "true", success: true, message: FLUTTER_MESSAGES.ritualBookingDetailsSuccess, data: { data: formatted } });
+  } catch (error) { return sendError(res, 500, error.message); }
 };
 
-/**
- * ============================================================================
- * GET ALL RITUALS (Global Feed for the Frontend)
- * ============================================================================
- */
+// 🎯 FIX: Supports [0, 1] universally & Sanitize Corrupt Migration Data
 exports.getAllRituals = async (req, res) => {
   try {
-    const rituals = await Ritual.find({ status: 1 })
+    const rituals = await Ritual.find({ status: { $in: [0, 1] } })
+      .populate('ritual_type_id', 'name')
       .sort({ sequence: 1, created_at: -1 })
       .lean();
 
-    // Fetch all related temples to stitch the names
     const templeIds = [...new Set(rituals.map(r => r.temple_id).filter(Boolean))];
     const temples = await Temple.find({ _id: { $in: templeIds } }).select('name city_name sql_id').lean();
     
-    // Create a fast lookup dictionary
     const templeMap = temples.reduce((acc, t) => {
         acc[t._id.toString()] = t;
         return acc;
@@ -506,25 +427,24 @@ exports.getAllRituals = async (req, res) => {
     const formatted = rituals.map(ritual => {
       const temple = ritual.temple_id ? templeMap[ritual.temple_id.toString()] : null;
       
+      let finalName = ritual.name || "";
+      if (/^\d+$/.test(finalName.trim()) && ritual.description) finalName = ritual.description;
+
       return {
         _id: ritual._id,
         id: Number(ritual.sql_id) || 0,
-        name: String(ritual.name || ""),
+        name: String(finalName),
         description: String(ritual.description || ""),
+        type: ritual.ritual_type_id ? ritual.ritual_type_id.name : null,
         temple_id: temple ? Number(temple.sql_id) : 0,
         temple_name: temple ? String(temple.name) : "",
-        image: formatImageUrl(ritual.image),
-        image_thumb: formatImageUrl(ritual.image)
+        image: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
+        image_thumb: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image)
       };
-    });
+    });buildTempleAddress
 
-    return res.status(200).json({
-      success: true,
-      data: formatted
-    });
-
+    return res.status(200).json({ success: true, data: formatted });
   } catch (error) {
-    console.error("🔥 Global Ritual Fetch Error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

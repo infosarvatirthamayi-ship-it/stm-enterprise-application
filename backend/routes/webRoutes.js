@@ -21,6 +21,7 @@ const membershipWebController = require('../controllers/web/membershipWebControl
 const webProfileController = require('../controllers/web/webProfileController');
 const webBookingController = require('../controllers/web/templeBookingWebController');
 
+const webRitualController = require('../controllers/web/ritualWebController');
 const { 
     initiateTempleBooking, 
     verifyTempleBooking 
@@ -70,6 +71,9 @@ router.get('/home', homeController.getHomeData);
 router.get('/states', webTempleController.getPublicStates);
 router.get('/temples', webTempleController.getWebTemples);
 router.get('/temples/:id', webTempleController.getWebTempleById);
+router.get('/rituals', webRitualController.getAllWebRituals);
+router.get('/rituals/:ritualId/packages', webRitualController.getRitualPackages);
+
 router.get('/about-data', aboutController.getWebAboutData);
 
 
@@ -113,6 +117,9 @@ router.post('/user/temple-booking/verify', protectWeb, verifyTempleBooking);
 
 router.post('/temples/:templeId/book', protectWeb, webBookingController.initiateTempleBooking);
 router.post('/temples/verify-booking', protectWeb, webBookingController.verifyTempleBooking);
+
+router.post('/user/ritual-booking/initiate', protectWeb, webRitualController.initiateRitualBooking);
+router.post('/user/ritual-booking/verify', protectWeb, webRitualController.verifyRitualPayment);
 
 // Favorites Engine
 router.get('/profile/favorite-temples', protectWeb, usersController.getMyFavoriteTemples);

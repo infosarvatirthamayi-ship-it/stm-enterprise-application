@@ -111,7 +111,7 @@ const getAuthUserSqlId = async (req) => {
   return 0;
 };
 
-// 🎯 FIX: Supports [0, 1] universally & fetches Type
+// 🎯 FIX: Supports [0, 1] universally, fetches Type, and securely passes MongoDB _id
 exports.getRitualsByTemple = async (req, res) => {
   try {
     const source = { ...req.query, ...req.body };
@@ -146,7 +146,8 @@ exports.getRitualsByTemple = async (req, res) => {
       if (/^\d+$/.test(finalName.trim()) && ritual.description) finalName = ritual.description;
 
       return {
-        id: Number(ritual.sql_id) || 0,
+        _id: ritual._id, // 🎯 THE FIX: Crucial for Web BFF Routing
+        id: Number(ritual.sql_id) || 0, // Kept for legacy Flutter mobile support
         name: String(finalName),
         description: String(ritual.description || ""),
         type: ritual.ritual_type_id ? ritual.ritual_type_id.name : null,

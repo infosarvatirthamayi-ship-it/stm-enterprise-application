@@ -160,14 +160,16 @@ export default function RitualView() {
               </div>
             </div>
 
-            <div className="hidden lg:block pt-4">
-              <button 
-                onClick={() => navigate(`/user/book-ritual/${ritual._id}`)}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:-translate-y-1 transition-all active:scale-95 flex items-center justify-center gap-3"
-              >
-                Proceed to Package Selection <ArrowRight size={18} />
-              </button>
-            </div>
+            // Find this block in ritualview.jsx
+<div className="hidden lg:block pt-4">
+  <button 
+    // 🎯 THE FIX: Use the 'id' variable from useParams() directly!
+    onClick={() => navigate(`/user/book-ritual/${id}`)}
+    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:-translate-y-1 transition-all active:scale-95 flex items-center justify-center gap-3"
+  >
+    Proceed to Package Selection <ArrowRight size={18} />
+  </button>
+</div>
           </div>
         </div>
       </main>

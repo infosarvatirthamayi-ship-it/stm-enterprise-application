@@ -24,7 +24,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { user, authenticated, loading: authLoading } = useUserAuth(); 
   const { isDarkMode } = useTheme(); 
-  
+  const ENABLE_MEMBERSHIP = false;
   const [plans, setPlans] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -122,12 +122,14 @@ export default function LandingPage() {
             </p>
             
             <div className="flex flex-col sm:flex-row justify-center gap-5">
-              <button
-                onClick={handleSTMClubClick}
-                className="px-12 py-5 bg-purple-600 text-white font-black rounded-2xl shadow-[0_0_40px_rgba(147,51,234,0.4)] hover:bg-purple-500 hover:shadow-[0_0_60px_rgba(147,51,234,0.6)] hover:-translate-y-1 transition-all duration-300 uppercase text-xs tracking-[0.2em]"
-              >
-                Enter the Club
-              </button>
+              {ENABLE_MEMBERSHIP && (
+  <button
+    onClick={handleSTMClubClick}
+    className="px-12 py-5 bg-purple-600 text-white font-black rounded-2xl shadow-[0_0_40px_rgba(147,51,234,0.4)] hover:bg-purple-500 hover:shadow-[0_0_60px_rgba(147,51,234,0.6)] hover:-translate-y-1 transition-all duration-300 uppercase text-xs tracking-[0.2em]"
+  >
+    Enter the Club
+  </button>
+)}
               <Link
                 to="/user/temples"
                 className="px-12 py-5 bg-white/10 backdrop-blur-xl border border-white/20 text-white font-black rounded-2xl hover:bg-white hover:text-slate-900 transition-all duration-300 uppercase text-xs tracking-[0.2em]"
@@ -251,13 +253,15 @@ export default function LandingPage() {
               </p>
               
               <div className="pt-6">
-                <button 
-                  onClick={handleSTMClubClick} 
-                  className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-amber-500 to-amber-300 text-slate-900 font-black rounded-2xl uppercase text-[11px] tracking-widest overflow-hidden transition-all hover:scale-105 shadow-[0_0_40px_rgba(251,191,36,0.2)]"
-                >
-                  <span className="absolute inset-0 w-full h-full bg-white/30 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-out" />
-                  {authenticated ? "Enter My Dashboard" : "Become a Member"}
-                </button>
+                {ENABLE_MEMBERSHIP && (
+  <button 
+    onClick={handleSTMClubClick} 
+    className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-amber-500 to-amber-300 text-slate-900 font-black rounded-2xl uppercase text-[11px] tracking-widest overflow-hidden transition-all hover:scale-105 shadow-[0_0_40px_rgba(251,191,36,0.2)]"
+  >
+    <span className="absolute inset-0 w-full h-full bg-white/30 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-out" />
+    {authenticated ? "Enter My Dashboard" : "Become a Member"}
+  </button>
+)}
               </div>
             </div>
 

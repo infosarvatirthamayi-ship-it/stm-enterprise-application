@@ -13,6 +13,8 @@ export default function Navbar() {
   const { user, logout } = useUserAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   
+  const ENABLE_MEMBERSHIP = false;
+  
   const [scrolled, setScrolled] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -146,11 +148,18 @@ export default function Navbar() {
               </AnimatePresence>
             </div>
 
-            {/* STM Club Upsell */}
-            <RouterLink to="/user/stm-club" className="relative group overflow-hidden px-6 py-2.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all hover:-translate-y-0.5">
-              <span className="relative z-10 flex items-center gap-1.5"><ShieldCheck size={14}/> STM Club</span>
-              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
-            </RouterLink>
+            {/* STM Club Upsell (Hidden behind feature flag) */}
+{ENABLE_MEMBERSHIP && (
+  <RouterLink 
+    to="/user/stm-club" 
+    className="relative group overflow-hidden px-6 py-2.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all hover:-translate-y-0.5"
+  >
+    <span className="relative z-10 flex items-center gap-1.5">
+      <ShieldCheck size={14}/> STM Club
+    </span>
+    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+  </RouterLink>
+)}
           </div>
 
           {/* 3. RIGHT ACTION SECTION */}

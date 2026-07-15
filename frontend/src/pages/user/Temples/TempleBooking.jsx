@@ -17,6 +17,9 @@ export default function TempleBooking() {
   const { isDarkMode: dark } = useTheme();
   const { user, authenticated, loading: authLoading } = useUserAuth();
 
+  // 🎯 FEATURE FLAG: Set to true when the client wants the membership module back
+  const ENABLE_MEMBERSHIP = false; 
+
   const [temple, setTemple] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -66,7 +69,9 @@ export default function TempleBooking() {
         setTemple(templeData);
         
         let basePrice = Number(templeData?.visit_price) || 0;
-        let discount = isMember ? (basePrice * 0.25) : 0; // 25% Discount logic
+        
+        // 🎯 Feature Flag applied to math
+        let discount = (ENABLE_MEMBERSHIP && isMember) ? (basePrice * 0.25) : 0; 
         
         setPriceData({ 
             base: basePrice, 
@@ -95,7 +100,7 @@ export default function TempleBooking() {
       }
     };
     fetchBookingDetails();
-  }, [id, authLoading, authenticated, user, navigate]);
+  }, [id, authLoading, authenticated, user, navigate, ENABLE_MEMBERSHIP]);
 
   // 3. Voucher Logic
   const applyVoucher = async () => {
@@ -232,28 +237,30 @@ export default function TempleBooking() {
                   </div>
                 </div>
                 
-                {/* UPSELL / MEMBER BADGE SECTION */}
+                {/* 🎯 UPSELL / MEMBER BADGE SECTION (Wrapped in Feature Flag) */}
                 <div>
-                  {priceData.isMember ? (
-                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-start gap-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-600 dark:text-emerald-400 p-5 rounded-[2rem] border border-emerald-500/30 shadow-sm relative overflow-hidden">
-                      <Sparkles size={40} className="absolute -right-2 top-0 opacity-20 rotate-12" />
-                      <div className="p-2 bg-emerald-500 text-white rounded-xl shrink-0"><Crown size={20} /></div>
-                      <div>
-                          <p className="text-sm font-black uppercase tracking-widest leading-none mb-1 text-emerald-500">Active Member</p>
-                          <p className="text-xs font-medium opacity-90 text-slate-700 dark:text-slate-300">Your 25% STM Club discount is automatically applied.</p>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div whileHover={{ y: -2 }} className="p-5 bg-gradient-to-br from-amber-500/20 to-orange-500/10 rounded-[2rem] border border-amber-500/30 relative overflow-hidden group">
-                      <div className="relative z-10 flex flex-col justify-between gap-3">
+                  {ENABLE_MEMBERSHIP && (
+                    priceData.isMember ? (
+                      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-start gap-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-600 dark:text-emerald-400 p-5 rounded-[2rem] border border-emerald-500/30 shadow-sm relative overflow-hidden">
+                        <Sparkles size={40} className="absolute -right-2 top-0 opacity-20 rotate-12" />
+                        <div className="p-2 bg-emerald-500 text-white rounded-xl shrink-0"><Crown size={20} /></div>
                         <div>
-                          <h4 className="text-amber-600 dark:text-amber-400 font-black text-sm flex items-center gap-2 uppercase tracking-tighter"><Crown size={18} /> Unlock 25% Off</h4>
-                          <p className="text-slate-600 dark:text-slate-300 text-xs font-medium mt-1 leading-relaxed">Join the STM Club today to get instant discounts on all Darshans.</p>
+                            <p className="text-sm font-black uppercase tracking-widest leading-none mb-1 text-emerald-500">Active Member</p>
+                            <p className="text-xs font-medium opacity-90 text-slate-700 dark:text-slate-300">Your 25% STM Club discount is automatically applied.</p>
                         </div>
-                        <button onClick={() => navigate("/user/stm-club")} className="bg-amber-500 text-slate-950 w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-all text-center">View Club Benefits</button>
-                      </div>
-                      <Crown size={80} className="absolute -bottom-4 -right-4 text-amber-500/10 group-hover:rotate-12 transition-transform" />
-                    </motion.div>
+                      </motion.div>
+                    ) : (
+                      <motion.div whileHover={{ y: -2 }} className="p-5 bg-gradient-to-br from-amber-500/20 to-orange-500/10 rounded-[2rem] border border-amber-500/30 relative overflow-hidden group">
+                        <div className="relative z-10 flex flex-col justify-between gap-3">
+                          <div>
+                            <h4 className="text-amber-600 dark:text-amber-400 font-black text-sm flex items-center gap-2 uppercase tracking-tighter"><Crown size={18} /> Unlock 25% Off</h4>
+                            <p className="text-slate-600 dark:text-slate-300 text-xs font-medium mt-1 leading-relaxed">Join the STM Club today to get instant discounts on all Darshans.</p>
+                          </div>
+                          <button onClick={() => navigate("/user/stm-club")} className="bg-amber-500 text-slate-950 w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-all text-center">View Club Benefits</button>
+                        </div>
+                        <Crown size={80} className="absolute -bottom-4 -right-4 text-amber-500/10 group-hover:rotate-12 transition-transform" />
+                      </motion.div>
+                    )
                   )}
                 </div>
 
@@ -265,7 +272,7 @@ export default function TempleBooking() {
                             <span>Standard Entry</span>
                             <span>₹{priceData.base}</span>
                         </div>
-                        {priceData.memberDiscount > 0 && (
+                        {ENABLE_MEMBERSHIP && priceData.memberDiscount > 0 && (
                             <div className="flex justify-between items-center text-[11px] font-black text-emerald-500 uppercase tracking-widest">
                                 <span className="flex items-center gap-1.5"><ShieldCheck size={14}/> Member Savings (25%)</span>
                                 <span>- ₹{priceData.memberDiscount}</span>
@@ -289,7 +296,7 @@ export default function TempleBooking() {
               <div className="xl:col-span-7">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[3rem] p-6 md:p-10 shadow-2xl border ${dark ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-100'}`}>
                   <h3 className="text-2xl md:text-3xl font-black font-serif tracking-tight mb-8 flex items-center gap-3">
-                      Devotee Enrollment {priceData.isMember && <Sparkles className="text-amber-400" size={24}/>}
+                      Devotee Enrollment {ENABLE_MEMBERSHIP && priceData.isMember && <Sparkles className="text-amber-400" size={24}/>}
                   </h3>
                   
                   <div className="space-y-6 md:space-y-8">

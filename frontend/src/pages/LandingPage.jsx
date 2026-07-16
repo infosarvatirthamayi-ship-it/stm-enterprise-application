@@ -223,21 +223,22 @@ export default function LandingPage() {
         </div>
       </Element>
 
-      {/* --- MEMBERSHIP (STM CLUB) SECTION --- */}
+      {/* --- MEMBERSHIP (STM CLUB) SECTION --- 
       <section className={`py-32 px-6 relative overflow-hidden ${isDarkMode ? 'bg-[#0f172a]' : 'bg-slate-100'}`}>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-500/10 blur-[120px] rounded-full pointer-events-none" />
 
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center bg-slate-950 rounded-[3rem] p-10 md:p-20 shadow-2xl relative overflow-hidden border border-white/5">
             
-            {/* Spinning Gradient Aura */}
+            
             <motion.div 
               animate={{ rotate: 360 }}
               transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
               className="absolute -top-[50%] -right-[20%] w-[800px] h-[800px] bg-gradient-to-b from-amber-500/10 via-purple-500/10 to-transparent blur-[80px] rounded-full pointer-events-none" 
             />
+            {ENABLE_MEMBERSHIP && (
+              <>
             
-            {/* Copy Row */}
             <div className="lg:col-span-6 space-y-8 relative z-10">
               <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-amber-400/10 border border-amber-400/20 backdrop-blur-md">
                 <Crown className="text-amber-400" size={16} />
@@ -254,18 +255,18 @@ export default function LandingPage() {
               
               <div className="pt-6">
                 {ENABLE_MEMBERSHIP && (
-  <button 
-    onClick={handleSTMClubClick} 
-    className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-amber-500 to-amber-300 text-slate-900 font-black rounded-2xl uppercase text-[11px] tracking-widest overflow-hidden transition-all hover:scale-105 shadow-[0_0_40px_rgba(251,191,36,0.2)]"
-  >
-    <span className="absolute inset-0 w-full h-full bg-white/30 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-out" />
-    {authenticated ? "Enter My Dashboard" : "Become a Member"}
-  </button>
-)}
+                <button 
+                  onClick={handleSTMClubClick} 
+                  className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-amber-500 to-amber-300 text-slate-900 font-black rounded-2xl uppercase text-[11px] tracking-widest overflow-hidden transition-all hover:scale-105 shadow-[0_0_40px_rgba(251,191,36,0.2)]"
+                >
+                  <span className="absolute inset-0 w-full h-full bg-white/30 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-out" />
+                  {authenticated ? "Enter My Dashboard" : "Become a Member"}
+                </button>
+              )}
               </div>
             </div>
 
-            {/* Pricing Card Display */}
+            
             <div className="lg:col-span-6 relative h-[450px] flex items-center justify-center">
               <AnimatePresence mode="wait">
                 {plans.length > 0 ? (
@@ -277,7 +278,7 @@ export default function LandingPage() {
                     transition={{ duration: 0.5, ease: "easeOut" }}
                     className="w-full max-w-sm p-12 rounded-[2.5rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl border border-white/20 text-center shadow-2xl relative overflow-hidden group z-10"
                   >
-                    {/* Glassmorphism Shine Effect */}
+                    
                     <motion.div
                       animate={{ x: ['-150%', '250%'] }}
                       transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatDelay: 2 }}
@@ -312,10 +313,12 @@ export default function LandingPage() {
                 )}
               </AnimatePresence>
             </div>
-
+            </>
+            )}
           </div>
         </div>
       </section>
+      */}
 
       {/* --- DIVINE SERVICES --- */}
       <section className="py-32 px-6">

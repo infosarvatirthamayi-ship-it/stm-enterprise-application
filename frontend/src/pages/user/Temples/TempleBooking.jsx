@@ -1,22 +1,34 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useUserAuth } from "../../../context/UserAuthContext"; 
+import { useUserAuth } from "../../../context/UserAuthContext";
 import { useTheme } from "../../../context/ThemeContext";
 import api from "../../../api/api";
 import { toast, Toaster } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { getFullImageUrl } from "../../../utils/config";
 import { 
-    Loader2, ChevronLeft, Calendar, User, Phone, 
-    Ticket, ShieldCheck, Crown, Sparkles, Heart, MapPin, CheckCircle, Download, ArrowRight
+  Loader2, MapPin, User, CheckCircle, Download, 
+  ChevronLeft, ShieldCheck, Calendar, Phone, 
+  MessageSquare, ArrowRight, Crown, Ticket, X, Sparkles, Heart
 } from "lucide-react";
+
+// 🛡️ RAZORPAY SCRIPT LOADER: Prevents "window.Razorpay is undefined" crashes
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 export default function TempleBooking() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, loading: authLoading, authenticated } = useUserAuth();
   const { isDarkMode: dark } = useTheme();
-  const { user, authenticated, loading: authLoading } = useUserAuth();
-
+  
   // 🎯 FEATURE FLAG: Set to true when the client wants the membership module back
   const ENABLE_MEMBERSHIP = false; 
 
@@ -25,13 +37,20 @@ export default function TempleBooking() {
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessView, setShowSuccessView] = useState(false);
   const [ticketUrl, setTicketUrl] = useState("");
-  
-  const [priceData, setPriceData] = useState({ 
-      base: 0, final: 0, memberDiscount: 0, voucherDiscount: 0, isMember: false 
-  });
-  
-  const [formData, setFormData] = useState({ 
-      bookingDate: "", devoteeName: "", whatsappNumber: "", specialWish: "", voucherCode: "" 
+  const [isAuthorizedMember, setIsAuthorizedMember] = useState(false);
+
+  // Voucher Selection Logic
+  const [voucherCode, setVoucherCode] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [isVerifyingVoucher, setIsVerifyingVoucher] = useState(false);
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+
+  const [formData, setFormData] = useState({
+    bookingDate: "",
+    devoteeName: "",
+    whatsappNumber: "",
+    specialWish: ""
   });
 
   // 1. Auth Protection
@@ -42,12 +61,12 @@ export default function TempleBooking() {
     }
   }, [authLoading, authenticated, navigate, id]);
 
-  // 2. Fetch Data
+  // 2. Fetch Data & Membership Status
   useEffect(() => {
     if (authLoading || !authenticated) return;
     if (!id || id === "undefined") return navigate("/user/temples");
 
-    const fetchBookingDetails = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
         const [templeRes, memberRes] = await Promise.allSettled([
@@ -59,93 +78,131 @@ export default function TempleBooking() {
             throw new Error("Temple not found");
         }
 
-        const templeData = templeRes.value.data?.data || templeRes.value.data?.temple;
-        if (!templeData) throw new Error("Invalid temple data");
-
+        setTemple(templeRes.value.data?.data || templeRes.value.data?.temple);
+        
         // Accurate Membership API Check
         const membershipData = memberRes.status === "fulfilled" ? memberRes.value.data?.data : null;
-        const isMember = !!membershipData || (user?.status === 1 && user?.membership === "active");
-
-        setTemple(templeData);
-        
-        let basePrice = Number(templeData?.visit_price) || 0;
-        
-        // 🎯 Feature Flag applied to math
-        let discount = (ENABLE_MEMBERSHIP && isMember) ? (basePrice * 0.25) : 0; 
-        
-        setPriceData({ 
-            base: basePrice, 
-            final: Math.max(0, basePrice - discount), 
-            memberDiscount: discount, 
-            voucherDiscount: 0,
-            isMember: isMember
-        });
+        setIsAuthorizedMember(!!membershipData || (user?.status === 1 && user?.membership === "active"));
 
         let safePhone = "";
         if (user?.mobile_number) {
             safePhone = String(user.mobile_number).replace(/\D/g, '').slice(-10);
         }
 
-        setFormData(prev => ({ 
-          ...prev, 
-          devoteeName: user?.first_name || user?.name || "", 
-          whatsappNumber: safePhone 
+        setFormData(prev => ({
+          ...prev,
+          devoteeName: user?.first_name || user?.name || "",
+          whatsappNumber: safePhone
         }));
 
       } catch (err) {
-        toast.error("Temple details could not be loaded.");
+        toast.error("Temple details not found.");
         navigate("/user/temples");
       } finally {
         setLoading(false);
       }
     };
-    fetchBookingDetails();
-  }, [id, authLoading, authenticated, user, navigate, ENABLE_MEMBERSHIP]);
+    loadData();
+  }, [id, authLoading, authenticated, user, navigate]);
 
-  // 3. Voucher Logic
-  const applyVoucher = async () => {
-    if (!formData.voucherCode) return toast.error("Please enter a code");
-    const loadToast = toast.loading("Verifying code...");
+  // 3. Dynamic Price & Savings Calculation 
+  const { finalPrice, membershipSavings, voucherSavings } = useMemo(() => {
+    const basePrice = Number(temple?.visit_price) || 0;
+    let currentPrice = basePrice;
+    let memDisc = 0;
+    let vDisc = 0;
+
+    if (ENABLE_MEMBERSHIP && isAuthorizedMember) {
+      memDisc = basePrice * 0.25; 
+      currentPrice -= memDisc;
+    }
+
+    if (appliedVoucher) {
+      vDisc = appliedVoucher.discountAmount;
+      currentPrice = Math.max(0, currentPrice - vDisc);
+    }
+
+    return {
+      finalPrice: Number(currentPrice.toFixed(2)),
+      membershipSavings: Number(memDisc.toFixed(2)),
+      voucherSavings: Number(vDisc.toFixed(2))
+    };
+  }, [temple, isAuthorizedMember, appliedVoucher, ENABLE_MEMBERSHIP]);
+
+  // Voucher Discovery Logic
+  const openCouponDiscovery = async () => {
     try {
-        const res = await api.post('/user/vouchers/verify', { 
-            voucherCode: formData.voucherCode,
-            serviceType: 'temple',
-            baseAmount: priceData.base - priceData.memberDiscount 
-        });
-        
-        const { discountAmount, finalAmount } = res.data.data;
-        setPriceData(prev => ({ ...prev, final: finalAmount, voucherDiscount: discountAmount }));
-        toast.success("Promo code applied!", { id: loadToast });
+      const res = await api.get("/user/vouchers/available?type=temple");
+      setAvailableCoupons(res.data.data || []);
+      setShowCouponModal(true);
     } catch (err) {
-        toast.error(err.response?.data?.message || "Invalid or Expired Code", { id: loadToast });
+      toast.error("Could not fetch offers.");
     }
   };
 
-  // 4. Payment Logic
+  const handleApplyVoucher = async (codeToApply = null) => {
+    const targetCode = codeToApply || voucherCode;
+    if (!targetCode.trim()) return toast.error("Enter a code first");
+    
+    setIsVerifyingVoucher(true);
+    try {
+      const priceForVoucher = (ENABLE_MEMBERSHIP && isAuthorizedMember) ? temple.visit_price * 0.75 : temple.visit_price;
+      
+      const res = await api.post("/user/vouchers/verify", {
+        code: targetCode,
+        amount: priceForVoucher,
+        serviceType: "temple"
+      });
+      setAppliedVoucher({
+        code: targetCode.toUpperCase(),
+        discountAmount: res.data.data.discountAmount
+      });
+      setVoucherCode(targetCode.toUpperCase());
+      setShowCouponModal(false);
+      toast.success("Divine Offer Applied!");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Code invalid for this visit.");
+    } finally {
+      setIsVerifyingVoucher(false);
+    }
+  };
+
+  // 4. Payment Logic (Wired perfectly to the Master Controller)
   const handlePayment = async () => {
     if (!formData.bookingDate) return toast.error("Please select a visit date.");
     if (!formData.devoteeName?.trim()) return toast.error("Primary devotee name is required.");
     if (!formData.whatsappNumber?.match(/^[0-9]{10}$/)) return toast.error("Enter a valid 10-digit WhatsApp number.");
 
     setSubmitting(true);
-    const loadingToast = toast.loading("Securing your digital pass...");
+    const loadingToast = toast.loading("Connecting to secure gateway...");
+
+    const isScriptLoaded = await loadRazorpayScript();
+    if (!isScriptLoaded) {
+      toast.error("Failed to load payment gateway. Please check your internet connection.", { id: loadingToast });
+      setSubmitting(false);
+      return;
+    }
 
     try {
-      const initRes = await api.post('/user/temple-booking/initiate', {
-        temple_id: temple?._id || temple?.id || temple?.sql_id,
+      // 🎯 EXACT PAYLOAD matching the Master Controller expectations
+      const payload = {
+        temple_id: temple?._id || temple?.id || id,
         date: formData.bookingDate,
         devotees_name: formData.devoteeName,
         whatsapp_number: formData.whatsappNumber,
         wish: formData.specialWish,
-        voucherCode: formData.voucherCode
-      });
+        voucherCode: appliedVoucher?.code || ""
+      };
 
+      // 🎯 EXACT ROUTE mapped through webRoutes.js
+      const initRes = await api.post('/web/user/temple-booking/initiate', payload);
       const orderData = initRes.data.data;
 
       if (initRes.data.isFree || orderData?.final_amount === 0) {
           toast.success("Darshan Secured! Pass activated.", { id: loadingToast });
-          setTicketUrl(initRes.data.ticketUrl || "success");
+          setTicketUrl(`/web/user/book-temple/ticket/${orderData?.bookingId}`);
           setShowSuccessView(true);
+          setSubmitting(false);
           return;
       }
 
@@ -159,9 +216,10 @@ export default function TempleBooking() {
         name: "Sarvatirthamayi",
         description: `Digital Pass: ${temple?.name || 'Temple'}`,
         handler: async (response) => {
-          const verifyToast = toast.loading("Verifying signature...");
+          const verifyToast = toast.loading("Verifying transaction signature...");
           try {
-            const verifyRes = await api.post("/user/temple-booking/verify", {
+            // 🎯 EXACT VERIFY ROUTE mapped through webRoutes.js
+            const verifyRes = await api.post("/web/user/temple-booking/verify", {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
@@ -170,25 +228,40 @@ export default function TempleBooking() {
 
             if (verifyRes.data.success) {
               toast.dismiss(verifyToast);
-              setTicketUrl(verifyRes.data.ticketUrl || "success");
+              setTicketUrl(verifyRes.data.ticketUrl || `/web/user/book-temple/ticket/${orderData.bookingId}`);
               setShowSuccessView(true);
               window.scrollTo({ top: 0, behavior: 'smooth' });
-            } else throw new Error("Verification failed.");
+            } else {
+              throw new Error("Verification failed.");
+            }
           } catch (error) { 
-              toast.error(error.message, { id: verifyToast }); 
+              toast.error(error.response?.data?.message || error.message, { id: verifyToast }); 
+              setSubmitting(false);
           }
         },
-        prefill: { name: formData.devoteeName, contact: formData.whatsappNumber, email: user?.email || "" },
+        prefill: { 
+          name: formData.devoteeName, 
+          contact: formData.whatsappNumber, 
+          email: user?.email || "" 
+        },
         theme: { color: "#9333ea" },
-        modal: { ondismiss: () => setSubmitting(false) }
+        modal: { 
+          ondismiss: () => {
+            toast("Payment cancelled by user.", { icon: "⚠️" });
+            setSubmitting(false); 
+          }
+        }
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', () => { toast.error("Transaction declined."); setSubmitting(false); });
+      rzp.on('payment.failed', (response) => { 
+        toast.error(`Transaction declined: ${response.error.description}`); 
+        setSubmitting(false); 
+      });
       rzp.open();
 
     } catch (err) {
-      toast.error(err.response?.data?.message || "Gateway error.", { id: loadingToast });
+      toast.error(err.response?.data?.message || "Gateway initialization error.", { id: loadingToast });
       setSubmitting(false);
     }
   };
@@ -237,10 +310,10 @@ export default function TempleBooking() {
                   </div>
                 </div>
                 
-                {/* 🎯 UPSELL / MEMBER BADGE SECTION (Wrapped in Feature Flag) */}
+                {/* 🎯 UPSELL / MEMBER BADGE SECTION */}
                 <div>
                   {ENABLE_MEMBERSHIP && (
-                    priceData.isMember ? (
+                    isAuthorizedMember ? (
                       <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-start gap-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-600 dark:text-emerald-400 p-5 rounded-[2rem] border border-emerald-500/30 shadow-sm relative overflow-hidden">
                         <Sparkles size={40} className="absolute -right-2 top-0 opacity-20 rotate-12" />
                         <div className="p-2 bg-emerald-500 text-white rounded-xl shrink-0"><Crown size={20} /></div>
@@ -270,23 +343,23 @@ export default function TempleBooking() {
                     <div className="space-y-3 text-sm font-bold">
                         <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
                             <span>Standard Entry</span>
-                            <span>₹{priceData.base}</span>
+                            <span>₹{temple?.visit_price}</span>
                         </div>
-                        {ENABLE_MEMBERSHIP && priceData.memberDiscount > 0 && (
+                        {ENABLE_MEMBERSHIP && isAuthorizedMember && (
                             <div className="flex justify-between items-center text-[11px] font-black text-emerald-500 uppercase tracking-widest">
                                 <span className="flex items-center gap-1.5"><ShieldCheck size={14}/> Member Savings (25%)</span>
-                                <span>- ₹{priceData.memberDiscount}</span>
+                                <span>- ₹{membershipSavings}</span>
                             </div>
                         )}
-                        {priceData.voucherDiscount > 0 && (
+                        {appliedVoucher && (
                             <div className="flex justify-between items-center text-[11px] font-black text-purple-500 uppercase tracking-widest animate-in fade-in">
                                 <span className="flex items-center gap-1.5"><Ticket size={14}/> Promo Applied</span>
-                                <span>- ₹{priceData.voucherDiscount}</span>
+                                <span>- ₹{voucherSavings}</span>
                             </div>
                         )}
                         <div className={`flex justify-between items-center pt-4 border-t ${dark ? 'border-slate-800' : 'border-slate-100'} text-xl font-black`}>
                             <span>Total Payable</span>
-                            <span className="text-purple-600">₹{priceData.final}</span>
+                            <span className="text-purple-600">₹{finalPrice}</span>
                         </div>
                     </div>
                 </div>
@@ -296,21 +369,29 @@ export default function TempleBooking() {
               <div className="xl:col-span-7">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[3rem] p-6 md:p-10 shadow-2xl border ${dark ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-100'}`}>
                   <h3 className="text-2xl md:text-3xl font-black font-serif tracking-tight mb-8 flex items-center gap-3">
-                      Devotee Enrollment {ENABLE_MEMBERSHIP && priceData.isMember && <Sparkles className="text-amber-400" size={24}/>}
+                      Devotee Enrollment {ENABLE_MEMBERSHIP && isAuthorizedMember && <Sparkles className="text-amber-400" size={24}/>}
                   </h3>
                   
                   <div className="space-y-6 md:space-y-8">
                     
-                    {/* VOUCHER UI */}
+                    {/* VOUCHER DISCOVERY UI */}
                     <div className={`p-5 rounded-[2rem] border-2 border-dashed ${dark ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2"><Ticket className="text-purple-600" size={16}/><h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400">Promo Code</h4></div>
+                        <button onClick={openCouponDiscovery} className="text-[10px] font-black text-purple-600 hover:underline uppercase tracking-tighter flex items-center gap-1"><Sparkles size={12}/> View Offers</button>
                       </div>
                       
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <input type="text" placeholder="ENTER CODE" value={formData.voucherCode} onChange={(e) => setFormData({...formData, voucherCode: e.target.value.toUpperCase()})} className={`flex-1 h-14 px-6 border-2 rounded-2xl outline-none font-bold focus:border-purple-500 transition-all uppercase tracking-widest text-sm ${dark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'}`}/>
-                        <button onClick={applyVoucher} className="h-14 px-8 bg-purple-600 text-white font-black rounded-2xl hover:bg-purple-700 transition-all text-[10px] tracking-widest uppercase">Apply</button>
-                      </div>
+                      {appliedVoucher ? (
+                        <div className="flex items-center justify-between bg-purple-600 text-white p-4 rounded-2xl shadow-xl animate-in zoom-in-95 duration-300">
+                          <div className="flex items-center gap-3"><CheckCircle size={20}/><p className="font-black text-lg tracking-[0.2em]">{appliedVoucher.code}</p></div>
+                          <button onClick={() => setAppliedVoucher(null)} className="p-2 hover:bg-white/20 rounded-full transition-colors"><X size={18}/></button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <input type="text" placeholder="ENTER CODE" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} className={`flex-1 h-14 px-6 border-2 rounded-2xl outline-none font-bold focus:border-purple-500 transition-all uppercase tracking-widest text-sm ${dark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'}`}/>
+                          <button onClick={() => handleApplyVoucher()} disabled={isVerifyingVoucher || !voucherCode} className="h-14 px-8 bg-purple-600 text-white font-black rounded-2xl hover:bg-purple-700 disabled:opacity-50 transition-all text-[10px] tracking-widest uppercase">{isVerifyingVoucher ? <Loader2 className="animate-spin mx-auto" size={16}/> : "Apply"}</button>
+                        </div>
+                      )}
                     </div>
 
                     {/* FORM FIELDS */}
@@ -332,13 +413,13 @@ export default function TempleBooking() {
 
                     <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Gotra, Rashi, or Special Sankalpam (Optional)</label>
-                        <div className="relative"><Heart className="absolute left-5 top-5 text-purple-500" size={20}/><textarea placeholder="Specific prayers..." rows="3" className={`w-full py-5 pl-14 pr-4 border-2 rounded-2xl outline-none focus:border-purple-500 transition-all font-bold resize-none ${dark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'}`} value={formData.specialWish} onChange={(e) => setFormData({...formData, specialWish: e.target.value})}/></div>
+                        <div className="relative"><MessageSquare className="absolute left-5 top-5 text-purple-500" size={20}/><textarea placeholder="Specific prayers..." rows="3" className={`w-full py-5 pl-14 pr-4 border-2 rounded-2xl outline-none focus:border-purple-500 transition-all font-bold resize-none ${dark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'}`} value={formData.specialWish} onChange={(e) => setFormData({...formData, specialWish: e.target.value})}/></div>
                     </div>
 
                     {/* SUBMIT BUTTON */}
                     <div className="pt-4">
                         <button onClick={handlePayment} disabled={submitting} className="group w-full bg-purple-600 text-white h-20 md:h-24 rounded-[2rem] font-black text-xl md:text-2xl shadow-2xl hover:bg-purple-700 active:scale-[0.98] transition-all flex items-center justify-center gap-4 disabled:opacity-70 relative overflow-hidden">
-                        {submitting ? <Loader2 className="animate-spin" size={28} /> : (<><ShieldCheck size={24} className="text-purple-300 hidden sm:block"/><span>Pay ₹{priceData.final} & Confirm</span><ArrowRight size={28} className="group-hover:translate-x-2 transition-transform"/></>)}
+                        {submitting ? <Loader2 className="animate-spin" size={28} /> : (<><ShieldCheck size={24} className="text-purple-300 hidden sm:block"/><span>Pay ₹{finalPrice} & Confirm</span><ArrowRight size={28} className="group-hover:translate-x-2 transition-transform"/></>)}
                         </button>
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 pt-4 opacity-50">
                             <img src="https://upload.wikimedia.org/wikipedia/commons/8/89/Razorpay_logo.svg" className="h-4" alt="Razorpay"/>
@@ -353,6 +434,34 @@ export default function TempleBooking() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* DISCOVERY MODAL */}
+      <AnimatePresence>
+        {showCouponModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-[#0f172a]/80 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className={`w-full max-w-md rounded-[3rem] p-8 sm:p-10 shadow-2xl border relative overflow-hidden ${dark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+              <Sparkles className="absolute -top-6 -left-6 text-purple-500/10 w-32 h-32" />
+              <div className="flex justify-between items-center mb-8 relative z-10">
+                  <h3 className="text-2xl font-black italic tracking-tighter">Divine Offers</h3>
+                  <button onClick={() => setShowCouponModal(false)} className={`p-2 rounded-full transition-colors ${dark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><X size={24}/></button>
+              </div>
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
+                {availableCoupons.length > 0 ? availableCoupons.map((cpn) => (
+                  <motion.div key={cpn._id} whileHover={{ x: 5 }} onClick={() => handleApplyVoucher(cpn.code)} className={`p-5 border-2 rounded-[2rem] cursor-pointer transition-all group ${dark ? 'border-purple-900/30 hover:bg-purple-900/10' : 'border-purple-50 hover:bg-purple-50/50'}`}>
+                    <div className="flex justify-between items-start mb-2">
+                        <span className="font-mono font-black text-purple-600 text-xl tracking-[0.2em]">{cpn.code}</span>
+                        <span className="text-[10px] font-black bg-purple-100 text-purple-600 px-3 py-1.5 rounded-full uppercase tracking-tighter">{cpn.discount_type === 'percentage' ? `${cpn.discount_value}% OFF` : `₹${cpn.discount_value} OFF`}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{cpn.description || "Valid for a limited duration on sacred visits."}</p>
+                  </motion.div>
+                )) : (
+                  <div className="text-center py-10 opacity-50"><Ticket size={40} className="mx-auto mb-4" /><p className="text-sm font-bold uppercase tracking-widest">No Active Offers</p></div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

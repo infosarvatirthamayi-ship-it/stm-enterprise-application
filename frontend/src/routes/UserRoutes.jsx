@@ -20,6 +20,7 @@ import MembershipSuccess from "../pages/user/STMClub/MembershipSuccess";
 
 import TempleList from '../pages/user/Temples/TempleList';
 import TempleView from '../pages/user/Temples/TempleView';
+import TempleBooking from '../pages/user/Temples/TempleBooking';
 import AssistanceIndex from '../pages/user/TempleAssistance/index';
 
 import RitualPage from '../pages/user/Rituals/ritualpage';
@@ -28,7 +29,7 @@ import RitualBookingForm from '../pages/user/Rituals/RitualBookingForm';
 import BookingSuccessPage from "../pages/user/Rituals/BookingSuccessPage";
 
 // The Booking component mapping to TempleBooking
-import BookingForm from "../pages/user/TempleAssistance/BookingForm"; 
+//import BookingForm from "../pages/user/TempleAssistance/BookingForm"; 
 
 // Protected Route Wrapper
 import { UserProtectedRoute } from "../components/protected/UserProtectedRoute";
@@ -73,13 +74,18 @@ export const UserRoutes = () => {
         </UserProtectedRoute>
       } />
       
-      {/* 🚀 THE FIX: This now strictly matches your browser URL: /user/book-temple/:id */}
+      {/* 🚀 THE FIX: This now strictly matches your browser URL: /user/book-temple/:id 
       <Route path="/user/book-temple/:id" element={
         <UserProtectedRoute allowedTypes={[3]}>
           <BookingForm />
         </UserProtectedRoute>
+      } />*/}
+      {/* 🚀 ADD THIS NEW ROUTE HERE */}
+      <Route path="/user/book-temple/:id" element={
+        <UserProtectedRoute allowedTypes={[3]}>
+          <TempleBooking />
+        </UserProtectedRoute>
       } />
-      
       <Route path="/user/book-ritual/:id" element={
         <UserProtectedRoute allowedTypes={[3]}>
           <RitualBookingForm />

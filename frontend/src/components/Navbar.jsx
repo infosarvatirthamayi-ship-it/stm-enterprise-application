@@ -22,9 +22,6 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isHomePage = location.pathname === "/";
-  const isTransparent = isHomePage && !scrolled;
-
   // Frontend routes perfectly matching UserRoutes.jsx
   const navLinks = [
     { name: "Home", path: "/" },
@@ -39,7 +36,7 @@ export default function Navbar() {
 
   // Scroll Listener for Glassmorphism effect
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50);
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -69,10 +66,10 @@ export default function Navbar() {
   return (
     <>
       <nav
-        className={`fixed top-4 left-1/2 -translate-x-1/2 w-[96%] max-w-7xl h-20 z-[999] rounded-[2rem] transition-all duration-500
+        className={`fixed top-4 left-1/2 -translate-x-1/2 w-[96%] max-w-7xl h-20 z-[999] rounded-[2rem] transition-all duration-300
           ${scrolled
-              ? "bg-white/85 dark:bg-slate-950/85 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] border border-white/20 dark:border-slate-800"
-              : "bg-black/10 backdrop-blur-md border border-white/10"
+              ? "bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl shadow-lg border border-slate-200/50 dark:border-slate-800"
+              : "bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-white/50 dark:border-slate-700/50 shadow-sm"
           }
         `}
       >
@@ -81,8 +78,8 @@ export default function Navbar() {
           {/* 1. LOGO */}
           <RouterLink to="/" className="group flex items-center">
             <span className="text-2xl md:text-3xl font-black tracking-tight flex items-center">
-              <span className="text-indigo-500">SARVA</span>
-              <span className={`transition-colors ${isTransparent ? "text-white" : "text-slate-900 dark:text-white"}`}>
+              <span className="text-indigo-600 dark:text-indigo-500">SARVA</span>
+              <span className="text-slate-900 dark:text-white transition-colors">
                 TIRTHAM
               </span>
             </span>
@@ -97,12 +94,14 @@ export default function Navbar() {
                   key={link.name}
                   to={link.path}
                   className={`text-xs font-black uppercase tracking-[0.15em] transition-all duration-300 relative py-2
-                    ${isActive ? "text-indigo-500" : (isTransparent ? "text-white/80 hover:text-white" : "text-slate-600 dark:text-slate-300 hover:text-indigo-500")}
+                    ${isActive 
+                      ? "text-indigo-600 dark:text-indigo-400" 
+                      : "text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400"}
                   `}
                 >
                   {link.name}
                   {isActive && (
-                    <motion.div layoutId="nav-indicator" className="absolute -bottom-1 left-0 right-0 h-0.5 bg-indigo-500 rounded-full" />
+                    <motion.div layoutId="nav-indicator" className="absolute -bottom-1 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full" />
                   )}
                 </RouterLink>
               );
@@ -114,9 +113,7 @@ export default function Navbar() {
               onMouseEnter={() => setActiveDropdown("services")}
               onMouseLeave={() => setActiveDropdown(null)}
             >
-              <button className={`flex items-center gap-1 text-xs font-black uppercase tracking-[0.15em] transition-colors
-                  ${isTransparent ? "text-white/80 hover:text-white" : "text-slate-600 dark:text-slate-300 hover:text-indigo-500"}
-              `}>
+              <button className="flex items-center gap-1 text-xs font-black uppercase tracking-[0.15em] text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
                 Services <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'services' ? 'rotate-180' : ''}`} />
               </button>
 
@@ -148,18 +145,18 @@ export default function Navbar() {
               </AnimatePresence>
             </div>
 
-            {/* STM Club Upsell (Hidden behind feature flag) */}
-{ENABLE_MEMBERSHIP && (
-  <RouterLink 
-    to="/user/stm-club" 
-    className="relative group overflow-hidden px-6 py-2.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all hover:-translate-y-0.5"
-  >
-    <span className="relative z-10 flex items-center gap-1.5">
-      <ShieldCheck size={14}/> STM Club
-    </span>
-    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
-  </RouterLink>
-)}
+            {/* STM Club Upsell */}
+            {ENABLE_MEMBERSHIP && (
+              <RouterLink 
+                to="/user/stm-club" 
+                className="relative group overflow-hidden px-6 py-2.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all hover:-translate-y-0.5"
+              >
+                <span className="relative z-10 flex items-center gap-1.5">
+                  <ShieldCheck size={14}/> STM Club
+                </span>
+                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+              </RouterLink>
+            )}
           </div>
 
           {/* 3. RIGHT ACTION SECTION */}
@@ -168,9 +165,7 @@ export default function Navbar() {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95
-                ${isTransparent ? "bg-white/10 text-white hover:bg-white/20" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-slate-700"}
-              `}
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-slate-700"
             >
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -185,10 +180,10 @@ export default function Navbar() {
                 >
                   <button className="flex items-center gap-3 pl-2">
                     <div className="text-right">
-                      <p className={`text-[9px] uppercase font-black tracking-widest ${isTransparent ? "text-white/60" : "text-slate-400"}`}>Welcome</p>
-                      <p className={`text-xs font-black truncate max-w-[100px] ${isTransparent ? "text-white" : "text-slate-900 dark:text-white"}`}>{user.name}</p>
+                      <p className="text-[9px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">Welcome</p>
+                      <p className="text-xs font-black truncate max-w-[100px] text-slate-900 dark:text-white">{user.name}</p>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-black flex items-center justify-center shadow-md border-2 border-white/20">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-black flex items-center justify-center shadow-md border-2 border-white/50 dark:border-slate-700">
                       {getUserInitial()}
                     </div>
                   </button>
@@ -204,9 +199,7 @@ export default function Navbar() {
 
             {/* Mobile Menu Toggle */}
             <button
-              className={`lg:hidden w-10 h-10 rounded-full flex items-center justify-center transition-colors
-                ${isTransparent ? "bg-white/10 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white"}
-              `}
+              className="lg:hidden w-10 h-10 rounded-full flex items-center justify-center transition-colors bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -268,11 +261,13 @@ export default function Navbar() {
               </div>
 
               {/* Mobile STM Club */}
-              <RouterLink to="/user/stm-club" className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-400 to-amber-500 rounded-2xl text-slate-900 shadow-md">
-                <div className="flex items-center gap-2 font-black uppercase tracking-widest text-xs">
-                  <ShieldCheck size={18} /> STM Club Access
-                </div>
-              </RouterLink>
+              {ENABLE_MEMBERSHIP && (
+                <RouterLink to="/user/stm-club" className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-400 to-amber-500 rounded-2xl text-slate-900 shadow-md">
+                  <div className="flex items-center gap-2 font-black uppercase tracking-widest text-xs">
+                    <ShieldCheck size={18} /> STM Club Access
+                  </div>
+                </RouterLink>
+              )}
 
               {/* Mobile Logout */}
               {user && (

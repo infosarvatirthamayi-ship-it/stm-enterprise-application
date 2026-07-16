@@ -136,12 +136,12 @@ export default function TempleView() {
                    {temple.is_free_today || temple.visit_price === 0 ? <span className="text-emerald-400">Free</span> : `₹${temple.visit_price}`}
                  </div>
                  {/* STM Club Upsell */}
-                 {temple.visit_price > 0 && (
+                 {/*{temple.visit_price > 0 && (
                     <div className="mt-3 inline-flex items-center gap-1.5 text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-lg border border-amber-400/20">
                       <Sparkles size={12} />
-                      <span className="text-[9px] font-black uppercase tracking-widest">Club Members save 25%</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest">Club Members save 25%</span> 
                     </div>
-                 )}
+                 )}*/}
                </div>
 
                <button 

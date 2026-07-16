@@ -20,15 +20,9 @@ const webTempleController = require('../controllers/web/templeController');
 const membershipWebController = require('../controllers/web/membershipWebController'); 
 const webProfileController = require('../controllers/web/webProfileController');
 const webBookingController = require('../controllers/web/templeBookingWebController');
-
 const webRitualController = require('../controllers/web/ritualWebController');
-const { 
-    initiateTempleBooking, 
-    verifyTempleBooking 
-} = require("../controllers/user/userTempleBookingController");
 
 // --- 2. Keep Shared/Global Controllers ---
-// 🎯 FIX: Updated to usersController
 const usersController = require('../controllers/user/usersController'); 
 const aboutController = require('../controllers/user/aboutController');
 const homeController = require('../controllers/user/homeController'); 
@@ -73,7 +67,6 @@ router.get('/temples', webTempleController.getWebTemples);
 router.get('/temples/:id', webTempleController.getWebTempleById);
 router.get('/rituals', webRitualController.getAllWebRituals);
 router.get('/rituals/:ritualId/packages', webRitualController.getRitualPackages);
-
 router.get('/about-data', aboutController.getWebAboutData);
 
 
@@ -112,12 +105,13 @@ router.put(
 
 router.get('/user/my-temple-bookings', protectWeb, webProfileController.getMyWebBookings);
 
-router.post('/user/temple-booking/initiate', protectWeb, initiateTempleBooking);
-router.post('/user/temple-booking/verify', protectWeb, verifyTempleBooking);
+// 🚀 MASTER TEMPLE BOOKING ROUTES (Cleaned up!)
+router.post('/user/temple-booking/initiate', protectWeb, webBookingController.initiateTempleBooking);
+router.post('/user/temple-booking/verify', protectWeb, webBookingController.verifyAndConfirmBooking);
+router.get('/user/book-temple/ticket/:id', protectWeb, webBookingController.downloadTicket);
+router.get('/user/my-temple-bookings', protectWeb, webBookingController.getMyBookings);
 
-router.post('/temples/:templeId/book', protectWeb, webBookingController.initiateTempleBooking);
-router.post('/temples/verify-booking', protectWeb, webBookingController.verifyTempleBooking);
-
+// Ritual Routes
 router.post('/user/ritual-booking/initiate', protectWeb, webRitualController.initiateRitualBooking);
 router.post('/user/ritual-booking/verify', protectWeb, webRitualController.verifyRitualPayment);
 

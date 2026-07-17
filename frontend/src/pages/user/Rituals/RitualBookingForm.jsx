@@ -18,6 +18,9 @@ export default function RitualBookingForm() {
   const { user, authenticated, loading: authLoading } = useUserAuth();
   const { isDarkMode: dark } = useTheme();
   
+  // 🎯 FEATURE FLAG: Set to true to bring back the STM Club UI and discounts
+  const ENABLE_MEMBERSHIP = false;
+
   const [ritual, setRitual] = useState(null);
   const [packages, setPackages] = useState([]);
   const [selectedPackage, setSelectedPackage] = useState(null);
@@ -36,9 +39,9 @@ export default function RitualBookingForm() {
     bookingDate: "", devoteeName: "", whatsappNumber: "", specialWish: ""
   });
 
-  // Calculate Prices based on selected package
+  // Calculate Prices based on selected package (Membership discount gated by flag)
   const basePrice = Number(selectedPackage?.original_price || 0);
-  const memberDiscount = isAuthorizedMember ? (basePrice * 0.25) : 0;
+  const memberDiscount = (ENABLE_MEMBERSHIP && isAuthorizedMember) ? (basePrice * 0.25) : 0;
   const voucherDiscount = appliedVoucher ? appliedVoucher.discountAmount : 0;
   const finalPrice = Math.max(0, basePrice - memberDiscount - voucherDiscount);
 
@@ -56,7 +59,6 @@ export default function RitualBookingForm() {
     const fetchRitualData = async () => {
       try {
         setLoading(true);
-        // 🎯 THE FIX: Fetching Membership using the correct webRoute endpoint
         const [ritualRes, packageRes, memberRes] = await Promise.allSettled([
             api.post(`/user/ritual/show`, { ritual_id: id }),
             api.get(`/web/rituals/${id}/packages`),
@@ -73,7 +75,6 @@ export default function RitualBookingForm() {
         setPackages(pkgs);
         if (pkgs.length > 0) setSelectedPackage(pkgs[0]);
 
-        // 🎯 THE FIX: Verify Membership Status reliably
         const membershipData = memberRes.status === "fulfilled" ? memberRes.value.data?.data : null;
         setIsAuthorizedMember(!!membershipData || (user?.status === 1 && user?.membership === "active"));
 
@@ -130,6 +131,11 @@ export default function RitualBookingForm() {
     } finally {
         setIsVerifyingVoucher(false);
     }
+  };
+
+  const handleApplyVoucher = (code) => {
+    setVoucherCode(code);
+    applyVoucher();
   };
 
   const loadRazorpayScript = () => {
@@ -279,7 +285,8 @@ export default function RitualBookingForm() {
                               <span>Base Price</span><span>₹{basePrice}</span>
                           </div>
                           
-                          {memberDiscount > 0 && (
+                          {/* 🎯 Gated Membership Discount */}
+                          {ENABLE_MEMBERSHIP && memberDiscount > 0 && (
                               <div className="flex justify-between items-center text-[11px] font-black text-emerald-500 uppercase tracking-widest">
                                   <span className="flex items-center gap-1.5"><ShieldCheck size={14}/> Member Savings</span>
                                   <span>- ₹{memberDiscount}</span>
@@ -307,26 +314,29 @@ export default function RitualBookingForm() {
           {/* --- RIGHT: FORM SECTION --- */}
           <div className="lg:col-span-7 space-y-6">
             
-            {isAuthorizedMember ? (
-              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4 bg-emerald-50/10 text-emerald-500 px-6 py-4 rounded-2xl border border-emerald-500/20 shadow-sm relative overflow-hidden">
-                <Crown size={24} className="shrink-0" />
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest leading-none mb-1">Active STM Member</p>
-                  <p className="text-[10px] font-bold opacity-80 uppercase">25% Discount Applied Securely</p>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div whileHover={{ y: -2 }} className={`p-5 sm:p-6 rounded-2xl border relative overflow-hidden shadow-sm ${dark ? 'bg-amber-900/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
-                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* 🎯 Gated Membership Banners */}
+            {ENABLE_MEMBERSHIP && (
+              isAuthorizedMember ? (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4 bg-emerald-50/10 text-emerald-500 px-6 py-4 rounded-2xl border border-emerald-500/20 shadow-sm relative overflow-hidden">
+                  <Crown size={24} className="shrink-0" />
                   <div>
-                    <h4 className={`font-black text-xs sm:text-sm flex items-center gap-2 uppercase tracking-wider ${dark ? 'text-amber-500' : 'text-amber-800'}`}><Gift size={16} /> STM Club Exclusive</h4>
-                    <p className={`text-[10px] sm:text-[11px] font-bold mt-1 uppercase tracking-tight ${dark ? 'text-amber-500/70' : 'text-amber-700/80'}`}>
-                        Join the club to save 25% instantly on this booking!
-                    </p>
+                    <p className="text-xs font-black uppercase tracking-widest leading-none mb-1">Active STM Member</p>
+                    <p className="text-[10px] font-bold opacity-80 uppercase">25% Discount Applied Securely</p>
                   </div>
-                  <button onClick={() => navigate("/user/stm-club")} className="bg-amber-500 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md shadow-amber-500/20 hover:bg-amber-600 transition-all shrink-0">Join Now</button>
-                </div>
-              </motion.div>
+                </motion.div>
+              ) : (
+                <motion.div whileHover={{ y: -2 }} className={`p-5 sm:p-6 rounded-2xl border relative overflow-hidden shadow-sm ${dark ? 'bg-amber-900/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+                  <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className={`font-black text-xs sm:text-sm flex items-center gap-2 uppercase tracking-wider ${dark ? 'text-amber-500' : 'text-amber-800'}`}><Gift size={16} /> STM Club Exclusive</h4>
+                      <p className={`text-[10px] sm:text-[11px] font-bold mt-1 uppercase tracking-tight ${dark ? 'text-amber-500/70' : 'text-amber-700/80'}`}>
+                          Join the club to save 25% instantly on this booking!
+                      </p>
+                    </div>
+                    <button onClick={() => navigate("/user/stm-club")} className="bg-amber-500 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md shadow-amber-500/20 hover:bg-amber-600 transition-all shrink-0">Join Now</button>
+                  </div>
+                </motion.div>
+              )
             )}
 
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[2.5rem] p-6 sm:p-10 shadow-xl border ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>

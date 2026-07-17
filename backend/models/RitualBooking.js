@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const ritualBookingSchema = new mongoose.Schema({
-  sql_id: { type: Number, unique: true },
+  sql_id: { type: Number, sparse: true },
   booking_id: String,
   user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   temple_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Temple' },

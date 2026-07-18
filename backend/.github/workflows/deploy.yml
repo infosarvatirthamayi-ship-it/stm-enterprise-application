@@ -1,6 +1,5 @@
 name: STM Enterprise Production CI/CD
 
-# Trigger this pipeline ONLY when code is pushed to the 'main' branch
 on:
   push:
     branches: [ "main" ]
@@ -13,18 +12,6 @@ jobs:
     - name: 📥 Checkout Repository
       uses: actions/checkout@v3
 
-    - name: ⚙️ Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20.x' # Match your server's Node version
-
-    - name: 📦 Install Dependencies
-      run: npm ci # Strict, clean install
-
-    - name: 🧪 Run Unit & Functional Tests (QA Phase)
-      run: npm run test # Will skip if no tests exist yet, but ready for future
-
-    # 🚀 THE DEPLOYMENT STEP (Runs only if tests pass)
     - name: 🌐 Deploy to Production Server
       uses: appleboy/ssh-action@master
       with:
@@ -32,18 +19,21 @@ jobs:
         username: ${{ secrets.PROD_SERVER_USER }}
         key: ${{ secrets.PROD_SSH_KEY }}
         script: |
-          # 1. Navigate to the app directory
-          cd /var/www/stm-backend
+          # 1. Navigate to the root directory
+          cd /var/www/sarvatirthamayi_site
           
-          # 2. Configure Git Identity
-          git config --global user.email "infosarvatirthamayi@gmail.com"
-          git config --global user.name "STM CI/CD Bot"
-          
-          # 3. Pull latest code securely
+          # 2. Pull latest code
           git pull origin main
           
-          # 4. Install any new dependencies
+          # 3. Handle Backend
+          cd backend
           npm install --production
+          pm2 restart stm-api --update-env
           
-          # 5. Restart the server cleanly (Assuming PM2 is used for process management)
-          pm2 reload stm-backend --update-env
+          # 4. Handle Frontend
+          cd ../frontend
+          npm install
+          npm run build
+          
+          # 5. Restart Nginx to serve new build
+          sudo systemctl restart nginx

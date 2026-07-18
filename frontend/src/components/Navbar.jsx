@@ -30,7 +30,7 @@ export default function Navbar() {
   ];
 
   const servicesLinks = [
-    { name: "Temple Assistant", href: "/user/temple-assistance", icon: <User size={18} /> },
+    //{ name: "Temple Assistant", href: "/user/temple-assistance", icon: <User size={18} /> },
     { name: "Divine Rituals", href: "/user/rituals", icon: <Sparkles size={18} /> },
   ];
 

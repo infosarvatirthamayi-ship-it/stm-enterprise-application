@@ -130,6 +130,13 @@ export default function LandingPage() {
     Enter the Club
   </button>
 )}
+              {/* NEW: Ritual Services Primary Button */}
+  <Link
+    to="/user/rituals"
+    className="px-12 py-5 bg-orange-600 text-white font-black rounded-2xl shadow-[0_0_40px_rgba(234,88,12,0.4)] hover:bg-orange-500 hover:shadow-[0_0_60px_rgba(234,88,12,0.6)] hover:-translate-y-1 transition-all duration-300 uppercase text-xs tracking-[0.2em] text-center"
+  >
+    Ritual Services
+  </Link>
               <Link
                 to="/user/temples"
                 className="px-12 py-5 bg-white/10 backdrop-blur-xl border border-white/20 text-white font-black rounded-2xl hover:bg-white hover:text-slate-900 transition-all duration-300 uppercase text-xs tracking-[0.2em]"

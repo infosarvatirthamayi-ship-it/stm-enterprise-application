@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
-const mobileUserController = require('../controllers/mobile.user.controller');
+const userController = require('../controllers/mobile/authMobileController');
 const { protect } = require('../middleware/authMiddleware');
 
 // 1. Authentication & Session
-router.post('/login', mobileUserController.login);
+router.post('/login', userController.login);
 router.get('/refresh', authController.refreshAccessToken); // Added for Auto-Update
 router.post('/logout', authController.logout);             // Added for Cookie clearing
 

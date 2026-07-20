@@ -43,8 +43,10 @@ exports.login = async (req, res) => {
         const token = generateAccessToken(user);
         return res.status(200).json({ 
             status: "true", 
+            success: true,         // 👈 ADDED: The boolean Dart is likely looking for
             message: "Login successful",
             token: token, 
+            user: serializeUser(user, 'mobile'), // 👈 ADDED: Fills the "user" key
             data: {
                 ...serializeUser(user, 'mobile'),
                 access_token: token,

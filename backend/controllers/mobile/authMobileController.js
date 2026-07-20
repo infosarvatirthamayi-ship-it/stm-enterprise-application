@@ -21,9 +21,12 @@ exports.login = async (req, res) => {
         if (isValidEmail(identifier)) {
             query.email = normalizeEmail(identifier);
         } else {
-            const mobile = normalizeMobile(identifier);
-            if (!mobile) return res.status(400).json({ status: "false", message: "Invalid mobile format." });
-            query.mobile_number = mobile;
+            // 🎯 THE FIX: Use the forgiving Regex match just like the web controller!
+            const cleanMobile = String(identifier).replace(/\D/g, "");
+            if (cleanMobile.length < 7) {
+                 return res.status(400).json({ status: "false", message: "Invalid mobile format." });
+            }
+            query.mobile_number = { $regex: new RegExp(cleanMobile + "$") };
         }
         
         // 🎯 QUERY ISOLATED DATABASE: Only searches Devotees

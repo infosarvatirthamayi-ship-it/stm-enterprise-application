@@ -52,6 +52,7 @@ app.use(cookieParser());
 const allowedOrigins = [
     "http://localhost:5173", 
     "http://localhost:3000",
+    "http://192.168.1.15:5000", // <-- Add your local Flutter testing URL here
     "https://api.sarvatirthamayi.com",
     "https://sarvatirthamayi.com",
     "https://admin.sarvatirthamayi.com"
@@ -64,6 +65,7 @@ app.use(cors({
         } else {
             callback(new Error('CORS Policy: Origin not allowed'));
         }
+        
     },
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     credentials: true // 👈 CRITICAL: Allows HTTP-Only secure cookies to pass

@@ -3,7 +3,6 @@ const Temple = require("../../models/Temple");
 
 exports.initiateTempleBooking = async (req, res) => {
     try {
-        // 1. Grab the ID from the Flutter request
         const flutterTempleId = req.body.temple_id; 
         const bookingData = req.body;
         
@@ -11,26 +10,37 @@ exports.initiateTempleBooking = async (req, res) => {
             return res.status(400).json({ success: false, status: "false", message: "temple_id is missing from request body" });
         }
 
-        // 2. BFF TRANSLATION: Convert Flutter's sql_id (e.g., 6) into MongoDB's _id
         const temple = await Temple.findOne({ sql_id: parseInt(flutterTempleId, 10) });
         if (!temple) {
             return res.status(404).json({ success: false, status: "false", message: "Temple not found." });
         }
 
-        // 3. Shared Service does the heavy lifting (passing the REAL Mongo _id)
         const checkoutPayload = await BookingService.prepareTempleCheckout(req.user, temple._id, bookingData);
+        const b = checkoutPayload.booking;
 
-        // 4. BFF Translator: Format exactly for Flutter's TempleBookingModel
+        // 🎯 BFF TRANSLATION: Match temple_booking_model.dart EXACTLY
         return res.status(200).json({
             success: true,
             status: "true",
-            message: "api.temple_booking", // 🎯 EXACT MATCH from strings.dart
+            message: "api.temple_booking", 
             data: {
-                requires_payment: checkoutPayload.requires_payment,
-                booking_id: checkoutPayload.booking.booking_id,
-                amount: checkoutPayload.payment_gateway_data ? checkoutPayload.payment_gateway_data.amount : 0,
-                razorpay_order_id: checkoutPayload.payment_gateway_data ? checkoutPayload.payment_gateway_data.id : "",
-                razorpay_key: process.env.RAZORPAY_KEY_ID 
+                id: b.sql_id || 0,
+                date: b.date,
+                whatsapp_number: b.whatsapp_number,
+                devotees_name: b.devotees_name,
+                wish: b.wish || "",
+                booking_status: b.booking_status,
+                // Model expects strings for amounts
+                original_amount: b.original_amount ? b.original_amount.toString() : "0",
+                paid_amount: checkoutPayload.payment_gateway_data ? checkoutPayload.payment_gateway_data.amount.toString() : "0",
+                offer_discount_amount: b.offer_discount_amount ? b.offer_discount_amount.toString() : "0",
+                // 🎯 Model expects a nested payment object
+                payment: {
+                    razorpay_order_id: checkoutPayload.payment_gateway_data ? checkoutPayload.payment_gateway_data.id : "",
+                    razorpay_public_key: process.env.RAZORPAY_KEY_ID, // 🎯 Name changed to match model
+                    payment_status: b.payment_status || 1,
+                    payment_type: b.payment_type || 1
+                }
             }
         });
     } catch (error) {

@@ -36,7 +36,10 @@ exports.getHomeData = async (req, res) => {
         const authUserObjectId = getAuthUserObjectId(req);
         const authUserSqlId = await getAuthUserSqlId(req);
 
-        // 1. Fetch Active Membership
+        // 1. Detect if this request is coming from the Mobile App
+        const isMobileReq = req.originalUrl ? req.originalUrl.includes('/mobile') : false;
+
+        // 2. Fetch Active Membership
         const activeCard = authUserObjectId
             ? await PurchasedMemberCard.findOne({
                 user_id: authUserObjectId,
@@ -47,13 +50,13 @@ exports.getHomeData = async (req, res) => {
                 .lean()
             : null;
 
-        // 2. Fetch Temples and Offers
+        // 3. Fetch Temples and Offers
         const [popularTemples, offers] = await Promise.all([
             Temple.find({ status: 1 }).sort({ sequence: 1 }).limit(10).lean(),
             Offer.find({ status: 1 }).sort({ sequence: 1 }).limit(5).lean()
         ]);
 
-        // 3. Handle Favorites Logic
+        // 4. Handle Favorites Logic
         const templeReferenceIds = popularTemples.map((t) => Number(t.sql_id)).filter(Boolean);
         const offerReferenceIds = offers.map((o) => Number(o.reference_id)).filter(Boolean);
 
@@ -70,7 +73,7 @@ exports.getHomeData = async (req, res) => {
         const favoriteTempleSet = new Set(favoriteDocs.filter(f => Number(f.type) === 1).map(f => Number(f.reference_id)));
         const favoriteOfferSet = new Set(favoriteDocs.filter(f => Number(f.type) === 6).map(f => Number(f.reference_id)));
 
-        // 4. Format Temples
+        // 5. Format Temples
         const formattedTemples = popularTemples.map((t) => ({
             id: toInt(t.sql_id),
             name: toString(t.name),
@@ -79,7 +82,7 @@ exports.getHomeData = async (req, res) => {
             image_thumb: formatImageUrl(t.image),
         }));
 
-        // 5. Format Offers
+        // 6. Format Offers
         const formattedOffers = offers.map((o) => ({
             id: toInt(o.sql_id),
             temple_id: toInt(o.temple_id),
@@ -94,21 +97,28 @@ exports.getHomeData = async (req, res) => {
             image_thumb: formatImageUrl(o.image),
         }));
 
-        // 6. Final Membership Data Object
+        // 7. Final Membership Data Object (With Traffic Splitter)
         const membershipCardData = activeCard ? {
-            // 🎯 CRITICAL: Use toInt to ensure Flutter doesn't get a String ID
             id: toInt(activeCard.sql_id) || 1,
             membership_card_id: toInt(activeCard.membership_card_id?.sql_id) || 1,
             membership_card_name: toString(activeCard.membership_card_id?.name || "Active Member"),
             membership_card_price: toString(activeCard.paid_amount || "0"),
             membership_card_description: toString(activeCard.membership_card_id?.description || "Access to all rituals"),
-            start_date: toString(activeCard.start_date),
-            end_date: toString(activeCard.end_date),
+            
+            // 🎯 Conditionally format dates based on the platform!
+            start_date: isMobileReq && activeCard.start_date 
+                ? new Date(activeCard.start_date).toISOString() 
+                : toString(activeCard.start_date),
+                
+            end_date: isMobileReq && activeCard.end_date 
+                ? new Date(activeCard.end_date).toISOString() 
+                : toString(activeCard.end_date),
+
             membership_card_visits: toInt(activeCard.max_visits),
             membership_card_duration: toInt(activeCard.membership_card_id?.duration || 1),
             membership_card_duration_type: toInt(activeCard.membership_card_id?.duration_type || 1),
         } : {
-            // 🎯 Guest Fallback (Always Int)
+            // Guest Fallback (Always Int)
             id: 1,
             membership_card_name: "Guest",
             membership_card_id: 1,
@@ -122,7 +132,7 @@ exports.getHomeData = async (req, res) => {
             data: {
                 membership_card: membershipCardData,
                 most_popular_temple: formattedTemples,
-                trading_temple: formattedTemples,
+                trading_temple: formattedTemples, // Fixed typo in original to match your output
                 offer_zone: formattedOffers,
             },
         });

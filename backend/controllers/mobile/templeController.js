@@ -67,10 +67,11 @@ exports.getMobileTemples = async (req, res) => {
         const totalPages = Math.ceil(totalCount / limitInt);
 
         // 🎯 Send the complete pagination object Flutter expects
+        // 🎯 Send the complete pagination object AND the exact message Flutter expects
         return res.status(200).json({ 
             status: "true", 
             success: true, 
-            message: "Temple list retrieved successfully",
+            message: "Temples list fetch successfully", // 🎯 EXACT STRING MATCH
             data: {
                 data: templeData,
                 total_count: totalCount,

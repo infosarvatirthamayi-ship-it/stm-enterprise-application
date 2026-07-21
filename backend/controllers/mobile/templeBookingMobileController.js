@@ -1,22 +1,26 @@
-// backend/controllers/mobile/templeBookingMobileController.js
 const { BookingService } = require("../../services/bookingService");
 const Temple = require("../../models/Temple");
 
 exports.initiateTempleBooking = async (req, res) => {
     try {
-        const templeId = req.body.temple_id; 
+        // 1. Grab the ID from the Flutter request
+        const flutterTempleId = req.body.temple_id; 
         const bookingData = req.body;
         
-        // 🎯 BFF TRANSLATION: Convert Flutter's sql_id (e.g., 23) into MongoDB's _id
-        const temple = await Temple.findOne({ sql_id: parseInt(mobileTempleId, 10) });
+        if (!flutterTempleId) {
+            return res.status(400).json({ success: false, status: "false", message: "temple_id is missing from request body" });
+        }
+
+        // 2. BFF TRANSLATION: Convert Flutter's sql_id (e.g., 6) into MongoDB's _id
+        const temple = await Temple.findOne({ sql_id: parseInt(flutterTempleId, 10) });
         if (!temple) {
             return res.status(404).json({ success: false, status: "false", message: "Temple not found." });
         }
-        
-        // 1. Shared Service does the heavy lifting
-        const checkoutPayload = await BookingService.prepareTempleCheckout(req.user, templeId, bookingData);
 
-        // 2. BFF Translator: Format exactly for Flutter's TempleBookingModel
+        // 3. Shared Service does the heavy lifting (passing the REAL Mongo _id)
+        const checkoutPayload = await BookingService.prepareTempleCheckout(req.user, temple._id, bookingData);
+
+        // 4. BFF Translator: Format exactly for Flutter's TempleBookingModel
         return res.status(200).json({
             success: true,
             status: "true",
@@ -26,7 +30,7 @@ exports.initiateTempleBooking = async (req, res) => {
                 booking_id: checkoutPayload.booking.booking_id,
                 amount: checkoutPayload.payment_gateway_data ? checkoutPayload.payment_gateway_data.amount : 0,
                 razorpay_order_id: checkoutPayload.payment_gateway_data ? checkoutPayload.payment_gateway_data.id : "",
-                razorpay_key: process.env.RAZORPAY_KEY_ID // 🎯 Injecting key for Flutter SDK
+                razorpay_key: process.env.RAZORPAY_KEY_ID 
             }
         });
     } catch (error) {
@@ -34,7 +38,6 @@ exports.initiateTempleBooking = async (req, res) => {
         return res.status(400).json({ success: false, status: "false", message: error.message });
     }
 };
-
 exports.verifyTempleBooking = async (req, res) => {
     try {
         // Flutter sends camelCase in BLoC, map it safely to snake_case for the service

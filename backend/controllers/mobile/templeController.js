@@ -39,12 +39,14 @@ const buildTempleQuery = (stateName, search) => {
 exports.getMobileTemples = async (req, res) => {
     try {
         const { stateName, search, page = 1, per_page = 15 } = req.query;
-        const limit = parseInt(per_page, 10);
-        const skip = (parseInt(page, 10) - 1) * limit;
+        const pageInt = parseInt(page, 10) || 1;
+        const limitInt = parseInt(per_page, 10) || 15;
+        const skip = (pageInt - 1) * limitInt;
 
         const query = buildTempleQuery(stateName, search);
         const [temples, totalCount] = await Promise.all([
-            Temple.find(query).select("sql_id name city_name visit_price image").sort({ sequence: 1 }).skip(skip).limit(limit).lean(),
+            // 🎯 Added 'sequence' to the select query
+            Temple.find(query).select("sql_id name city_name visit_price image sequence").sort({ sequence: 1 }).skip(skip).limit(limitInt).lean(),
             Temple.countDocuments(query)
         ]);
 
@@ -56,17 +58,31 @@ exports.getMobileTemples = async (req, res) => {
             id: parseInt(t.sql_id) || 0,
             name: t.name || "",
             city_name: t.city_name || "",
+            sequence: t.sequence || 0, // 🎯 Added for Flutter
             is_favorite: favoriteSet.has(Number(t.sql_id)) ? 1 : 0,
             image: formatImageUrl(t.image),
+            image_thumb: formatImageUrl(t.image), // 🎯 Added missing image_thumb
         }));
 
-        // 🎯 THE FIX: Wrap templeData in an object so Flutter parses it as a Map<String, dynamic>
+        const totalPages = Math.ceil(totalCount / limitInt);
+
+        // 🎯 Send the complete pagination object Flutter expects
         return res.status(200).json({ 
             status: "true", 
             success: true, 
+            message: "Temple list retrieved successfully",
             data: {
-                data: templeData, // We put the array inside a 'data' property
-                total_count: totalCount 
+                data: templeData,
+                total_count: totalCount,
+                current_page: pageInt,
+                per_page: limitInt,
+                total_pages: totalPages,
+                is_next: pageInt < totalPages,
+                is_prev: pageInt > 1,
+                has_pages: totalPages > 1,
+                from: totalCount === 0 ? 0 : skip + 1,
+                to: skip + templeData.length,
+                path: "/api/v1/mobile/temple/index"
             }
         });
     } catch (error) {

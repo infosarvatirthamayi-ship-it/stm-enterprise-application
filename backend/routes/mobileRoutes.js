@@ -12,6 +12,9 @@ const mobileBookingController = require('../controllers/mobile/templeBookingMobi
 const mobileTempleBookingController = require('../controllers/mobile/templeBookingMobileController');
 const homeController = require('../controllers/user/homeController');
 
+// At the top of the file, ensure the ritual controller is imported
+const ritualController = require('../controllers/user/ritualController');
+
 // --- Middleware ---
 const { protectMobile } = require('../middleware/authMiddleware');
 
@@ -60,5 +63,12 @@ router.post('/club/verify', protectMobile, membershipMobileController.verifyPaym
 
 router.post('/bookings/create', protectMobile, mobileBookingController.initiateTempleBooking);
 router.post('/bookings/verify', protectMobile, mobileBookingController.verifyTempleBooking);
+
+// Add these to your route definitions
+router.post('/ritual/index', ritualController.getRitualsByTemple);
+router.post('/ritual/show', ritualController.getRitualShow);
+router.post('/ritual/packages', ritualController.getRitualPackages);
+router.post('/ritual/booking', ritualController.createRitualOrder);
+router.post('/ritual/verify-booking', ritualController.verifyRitualBooking);
 
 module.exports = router;

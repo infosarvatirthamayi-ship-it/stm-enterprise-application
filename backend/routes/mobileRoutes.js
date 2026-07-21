@@ -32,7 +32,8 @@ router.get('/states', mobileTempleController.getPublicStates);
 router.get('/temples', mobileTempleController.getMobileTemples);
 router.get('/temple/index', mobileTempleController.getMobileTemples);
 router.post('/temples/details', mobileTempleController.getMobileTempleById); 
-
+// Add this line where your other temple routes are:
+router.post('/temple/show', mobileTempleController.getMobileTempleById);
 
 
 

@@ -93,7 +93,8 @@ exports.getMobileTemples = async (req, res) => {
 
 exports.getMobileTempleById = async (req, res) => {
     try {
-        const { id } = req.body; // Flutter sends ID in the body
+        // 🎯 1. Fix: Flutter sends "temple_id", not "id"
+        const id = req.body.temple_id || req.body.id; 
 
         if (!id || id === "undefined" || id === "null") {
             return res.status(400).json({ success: false, message: "Valid identifier required." });
@@ -111,17 +112,44 @@ exports.getMobileTempleById = async (req, res) => {
             isFavorite = (await Favorite.exists({ user_id: authUserSqlId, reference_id: temple.sql_id, type: 1, status: 1 })) ? 1 : 0;
         }
 
+        // 🎯 2. Fix: Format data exactly to Flutter's nested 'temple_show_model.dart' schema
+        const templeDetailData = {
+            id: parseInt(temple.sql_id) || 0,
+            name: temple.name || "",
+            short_description: temple.short_description || "",
+            long_description: temple.long_description || "",
+            mobile_number: temple.mobile_number || "",
+            visit_price: temple.visit_price || "",
+            address: {
+                full_address: temple.full_address || "",
+                address_line1: temple.address_line1 || "",
+                address_line2: temple.address_line2 || "",
+                landmark: temple.landmark || "",
+                city: temple.city || "",
+                state: temple.state || "",
+                pincode: temple.pincode || "",
+                country: temple.country || "",
+                latitude: temple.latitude || "",
+                longitude: temple.longitude || "",
+                address_url: temple.address_url || ""
+            },
+            open_time: temple.open_time || "",
+            close_time: temple.close_time || "",
+            is_favorite: isFavorite,
+            devotees_booked_count: parseInt(temple.devotees_booked_count) || 0,
+            image: formatImageUrl(temple.image),
+            image_thumb: formatImageUrl(temple.image)
+        };
+
         return res.status(200).json({
             status: "true",
             success: true,
-            data: {
-                ...temple,
-                id: parseInt(temple.sql_id) || 0,
-                is_favorite: isFavorite,
-                image: formatImageUrl(temple.image)
-            }
+            message: "Temple fetched successfully.", // 🎯 3. Fix: The EXACT string BLoC expects
+            data: templeDetailData
         });
+        
     } catch (error) {
+        console.error("Temple Details API Error:", error.message);
         return res.status(500).json({ success: false, message: error.message });
     }
 };

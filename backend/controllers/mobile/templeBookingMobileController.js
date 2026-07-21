@@ -1,10 +1,17 @@
 // backend/controllers/mobile/templeBookingMobileController.js
 const { BookingService } = require("../../services/bookingService");
+const Temple = require("../../models/Temple");
 
 exports.initiateTempleBooking = async (req, res) => {
     try {
         const templeId = req.body.temple_id; 
         const bookingData = req.body;
+        
+        // 🎯 BFF TRANSLATION: Convert Flutter's sql_id (e.g., 23) into MongoDB's _id
+        const temple = await Temple.findOne({ sql_id: parseInt(mobileTempleId, 10) });
+        if (!temple) {
+            return res.status(404).json({ success: false, status: "false", message: "Temple not found." });
+        }
         
         // 1. Shared Service does the heavy lifting
         const checkoutPayload = await BookingService.prepareTempleCheckout(req.user, templeId, bookingData);

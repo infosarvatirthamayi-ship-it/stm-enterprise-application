@@ -113,29 +113,35 @@ exports.getMobileTempleById = async (req, res) => {
         }
 
         // 🎯 2. Fix: Format data exactly to Flutter's nested 'temple_show_model.dart' schema
+        // 🎯 Format data strictly to Flutter's expected types (forcing Strings where needed)
         const templeDetailData = {
             id: parseInt(temple.sql_id) || 0,
-            name: temple.name || "",
-            short_description: temple.short_description || "",
-            long_description: temple.long_description || "",
-            mobile_number: temple.mobile_number || "",
-            visit_price: temple.visit_price || "",
+            name: String(temple.name || ""),
+            short_description: String(temple.short_description || ""),
+            long_description: String(temple.long_description || ""),
+            mobile_number: String(temple.mobile_number || ""),
+            
+            // 🎯 The likely culprits crashing Dart:
+            visit_price: String(temple.visit_price || ""), 
+            
             address: {
-                full_address: temple.full_address || "",
-                address_line1: temple.address_line1 || "",
-                address_line2: temple.address_line2 || "",
-                landmark: temple.landmark || "",
-                city: temple.city || "",
-                state: temple.state || "",
-                pincode: temple.pincode || "",
-                country: temple.country || "",
-                latitude: temple.latitude || "",
-                longitude: temple.longitude || "",
-                address_url: temple.address_url || ""
+                full_address: String(temple.full_address || ""),
+                address_line1: String(temple.address_line1 || ""),
+                address_line2: String(temple.address_line2 || ""),
+                landmark: String(temple.landmark || ""),
+                city: String(temple.city || ""),
+                state: String(temple.state || ""),
+                pincode: String(temple.pincode || ""),
+                country: String(temple.country || ""),
+                
+                // Coordinates are often mapped as Strings in Dart:
+                latitude: String(temple.latitude || ""),
+                longitude: String(temple.longitude || ""),
+                address_url: String(temple.address_url || "")
             },
-            open_time: temple.open_time || "",
-            close_time: temple.close_time || "",
-            is_favorite: isFavorite,
+            open_time: String(temple.open_time || ""),
+            close_time: String(temple.close_time || ""),
+            is_favorite: parseInt(isFavorite) || 0,
             devotees_booked_count: parseInt(temple.devotees_booked_count) || 0,
             image: formatImageUrl(temple.image),
             image_thumb: formatImageUrl(temple.image)

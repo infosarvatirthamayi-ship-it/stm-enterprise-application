@@ -30,6 +30,7 @@ router.post('/logout', protectMobile, authMobileController.logout);
 router.get('/home', protectMobile, homeController.getHomeData);
 router.get('/states', mobileTempleController.getPublicStates);
 router.get('/temples', mobileTempleController.getMobileTemples);
+router.get('/temple/index', mobileTempleController.getMobileTemples);
 router.post('/temples/details', mobileTempleController.getMobileTempleById); 
 
 

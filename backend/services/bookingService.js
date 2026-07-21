@@ -6,6 +6,7 @@ const PurchasedMemberCardTemple = require("../models/PurchasedMemberCardTemple")
 const Voucher = require("../models/Voucher"); // 👈 Import Voucher Model
 const { NotificationHub } = require("../controllers/shared/authService");
 const Razorpay = require("razorpay");
+const mongoose = require("mongoose");
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -71,6 +72,7 @@ exports.BookingService = {
 
         // Create Pending Booking Record
         const newBooking = await TempleBooking.create({
+            sql_id: Date.now(),
             booking_id: generateBookingId('TV'),
             user_id: user._id,
             temple_id: temple._id,

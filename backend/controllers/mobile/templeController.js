@@ -4,6 +4,7 @@ const Favorite = require("../../models/Favorite");
 const User = require("../../models/User");
 const formatImageUrl = require("../../utils/imageUrl");
 const mongoose = require("mongoose");
+const State = require("../../models/State"); // Added this since getPublicStates uses it!
 
 // --- Internal BFF Helpers ---
 const getAuthUserSqlId = async (req) => {
@@ -59,7 +60,15 @@ exports.getMobileTemples = async (req, res) => {
             image: formatImageUrl(t.image),
         }));
 
-        return res.status(200).json({ status: "true", success: true, data: templeData, total_count: totalCount });
+        // 🎯 THE FIX: Wrap templeData in an object so Flutter parses it as a Map<String, dynamic>
+        return res.status(200).json({ 
+            status: "true", 
+            success: true, 
+            data: {
+                data: templeData, // We put the array inside a 'data' property
+                total_count: totalCount 
+            }
+        });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }

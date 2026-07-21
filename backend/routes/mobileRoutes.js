@@ -34,7 +34,9 @@ router.get('/temple/index', mobileTempleController.getMobileTemples);
 router.post('/temples/details', mobileTempleController.getMobileTempleById); 
 // Add this line where your other temple routes are:
 router.post('/temple/show', mobileTempleController.getMobileTempleById);
-
+// 🎯 Mobile Temple Booking Routes
+router.post('/temple/booking', protectMobile, mobileTempleBookingController.initiateTempleBooking);
+router.post('/temple/booking/verify', protectMobile, mobileTempleBookingController.verifyTempleBooking);
 
 
 // Discovery (Public)

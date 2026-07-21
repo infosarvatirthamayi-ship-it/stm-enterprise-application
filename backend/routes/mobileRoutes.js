@@ -9,7 +9,7 @@ const usersController = require('../controllers/user/usersController');
 const mobileTempleController = require('../controllers/mobile/templeController'); 
 const membershipMobileController = require('../controllers/mobile/membershipMobileController'); 
 const mobileBookingController = require('../controllers/mobile/templeBookingMobileController');
-
+const mobileTempleBookingController = require('../controllers/mobile/templeBookingMobileController');
 const homeController = require('../controllers/user/homeController');
 
 // --- Middleware ---

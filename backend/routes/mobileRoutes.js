@@ -1,19 +1,20 @@
-// backend/routes/mobileRoutes.js
-
 const express = require('express');
 const router = express.Router();
 
+
 // --- Controllers ---
 const authMobileController = require('../controllers/mobile/authMobileController'); 
+// 🎯 FIX: Updated to usersController
 const usersController = require('../controllers/user/usersController');
 const mobileTempleController = require('../controllers/mobile/templeController'); 
 const membershipMobileController = require('../controllers/mobile/membershipMobileController'); 
+const mobileBookingController = require('../controllers/mobile/templeBookingMobileController');
 const mobileTempleBookingController = require('../controllers/mobile/templeBookingMobileController');
 const homeController = require('../controllers/user/homeController');
-const ritualController = require('../controllers/user/ritualController');
 
-// 🎯 NEW: Import the Mobile Ritual Booking Controller we just created!
 const mobileRitualBookingController = require('../controllers/mobile/ritualBookingMobileController');
+// At the top of the file, ensure the ritual controller is imported
+const ritualController = require('../controllers/user/ritualController');
 
 // --- Middleware ---
 const { protectMobile } = require('../middleware/authMiddleware');
@@ -35,11 +36,12 @@ router.get('/states', mobileTempleController.getPublicStates);
 router.get('/temples', mobileTempleController.getMobileTemples);
 router.get('/temple/index', mobileTempleController.getMobileTemples);
 router.post('/temples/details', mobileTempleController.getMobileTempleById); 
+// Add this line where your other temple routes are:
 router.post('/temple/show', mobileTempleController.getMobileTempleById);
-
 // 🎯 Mobile Temple Booking Routes
 router.post('/temple/booking', protectMobile, mobileTempleBookingController.initiateTempleBooking);
 router.post('/temple/booking/verify', protectMobile, mobileTempleBookingController.verifyTempleBooking);
+
 
 // Discovery (Public)
 router.get('/membership-plans/active', membershipMobileController.getActiveMembershipPlans);
@@ -60,24 +62,15 @@ router.post('/profile/favorite-temple', protectMobile, usersController.toggleFav
 router.post('/club/subscribe', protectMobile, membershipMobileController.createOrder);
 router.post('/club/verify', protectMobile, membershipMobileController.verifyPayment);
 
-// NOTE: These are duplicates of /temple/booking but kept for backwards compatibility if your app uses them
-router.post('/bookings/create', protectMobile, mobileTempleBookingController.initiateTempleBooking);
-router.post('/bookings/verify', protectMobile, mobileTempleBookingController.verifyTempleBooking);
+router.post('/bookings/create', protectMobile, mobileBookingController.initiateTempleBooking);
+router.post('/bookings/verify', protectMobile, mobileBookingController.verifyTempleBooking);
 
-// =========================================================================
-// 🕉️ RITUAL ROUTES
-// =========================================================================
-
-// 1. Read-Only Routes (Safe to use the shared web controller)
 router.post('/ritual/index', ritualController.getRitualsByTemple);
 router.post('/ritual/show', ritualController.getRitualShow);
 router.post('/ritual/packages', ritualController.getRitualPackages);
 
-// 2. 🎯 THE FIX: Booking Routes (Pointed to the new Mobile BFF Controller and protected)
+// 2. Booking & Verification Routes (Handled securely by mobileRitualBookingController)
 router.post('/ritual/booking', protectMobile, mobileRitualBookingController.initiateRitualBooking);
-
-// (I added both verify path variations just in case your Flutter app uses one or the other)
-router.post('/ritual/verify-payment', protectMobile, mobileRitualBookingController.verifyRitualBooking);
 router.post('/ritual/verify-booking', protectMobile, mobileRitualBookingController.verifyRitualBooking);
-
+router.post('/ritual/verify-payment', protectMobile, mobileRitualBookingController.verifyRitualBooking); // Added fallback alias
 module.exports = router;

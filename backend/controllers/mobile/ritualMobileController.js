@@ -15,13 +15,13 @@ const getRazorpayInstance = () => new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// 🎯 EXACT match to avoid Bloc condition failures
+// 🎯 EXACT match to Flutter Constants to avoid Bloc condition failures
 const FLUTTER_MESSAGES = {
-    ritualListSuccess: "Ritual list fetched successfully",
-    ritualShowSuccess: "Ritual fetched successfully",
-    ritualPackageSuccess: "Ritual packages fetched successfully",
-    ritualBookingSuccess: "Ritual booking created successfully.",
-    ritualVerifySuccess: "Ritual booking verified successfully.",
+    ritualsFetched: "Ritual list fetch successfully",
+    ritualFetched: "Ritual fetch successfully",
+    ritualPackagesFetched: "Ritual packages fetched successfully",
+    ritualBookingSuccess: "Ritual booking successfully.",
+    ritualVerifySuccess: "Ritual booking created successfully.",
 };
 
 const sendError = (res, statusCode, message) => {
@@ -45,7 +45,6 @@ const buildTempleAddress = (temple) => {
     const address1 = String(temple.address_line1 || "");
     const full_address = [address1, city, state].filter(Boolean).join(", ");
 
-    // Ensure coordinates are strings. Nulls/empty values safely default to "0.0" 
     let lat = temple.latitude || temple.location?.coordinates?.[1];
     let lng = temple.longitude || temple.location?.coordinates?.[0];
     lat = (lat === undefined || lat === null || lat === "") ? "0.0" : String(lat);
@@ -102,11 +101,10 @@ exports.getRitualsByTemple = async (req, res) => {
             };
         });
 
-        // 🎯 EXACT STRUCTURE FOR RitualModel (Source 19)
         return res.status(200).json({
             success: true,
             status: "true",
-            message: FLUTTER_MESSAGES.ritualListSuccess,
+            message: FLUTTER_MESSAGES.ritualsFetched,
             data: {
                 data: formatted,
                 total_count: formatted.length,
@@ -151,7 +149,6 @@ exports.getRitualShow = async (req, res) => {
         let finalName = ritualDoc.name || "";
         if (/^\d+$/.test(finalName.trim()) && ritualDoc.description) finalName = ritualDoc.description;
 
-        // 🎯 EXACT STRUCTURE FOR RitualShowModel (Source 14)
         const data = {
             id: Number(ritualDoc.sql_id || 0),
             name: String(finalName),
@@ -168,7 +165,7 @@ exports.getRitualShow = async (req, res) => {
         return res.status(200).json({
             success: true,
             status: "true",
-            message: FLUTTER_MESSAGES.ritualShowSuccess,
+            message: FLUTTER_MESSAGES.ritualFetched,
             data
         });
     } catch (error) {
@@ -199,12 +196,10 @@ exports.getRitualPackages = async (req, res) => {
             price: String(pkg.price || 0),
         }));
 
-        // 🎯 EXACT STRUCTURE FOR RitualPackageModel (Source 17)
-        // Note: Re-added the pagination fields which were missing and causing crashes.
         return res.status(200).json({
             success: true,
             status: "true",
-            message: FLUTTER_MESSAGES.ritualPackageSuccess,
+            message: FLUTTER_MESSAGES.ritualPackagesFetched,
             data: {
                 data: formatted,
                 total_count: formatted.length,
@@ -305,7 +300,6 @@ exports.initiateRitualBooking = async (req, res) => {
             purchased_member_card_id: activeMembership ? activeMembership._id : null
         });
 
-        // 🎯 EXACT STRUCTURE FOR RitualBookingModel (Source 15)
         return res.status(200).json({
             success: true,
             status: "true",
@@ -370,7 +364,6 @@ exports.verifyRitualBooking = async (req, res) => {
             await booking.save();
         }
 
-        // 🎯 EXACT STRUCTURE FOR RitualVerifyPaymentModel (Source 18)
         return res.status(200).json({
             success: true,
             status: "true",

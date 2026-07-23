@@ -54,8 +54,9 @@ const buildTempleAddress = (temple) => {
     state: String(state || ""),
     pincode: String(temple.pincode || ""), 
     country: String(temple.country_name || temple.country || "India"),
-    latitude: String(temple.location?.coordinates?.[1] || ""), 
-    longitude: String(temple.location?.coordinates?.[0] || ""),
+    // 🎯 FIX: Default to "0.0" so Flutter double.parse() doesn't crash
+    latitude: String(temple.location?.coordinates?.[1] || "0.0"), 
+    longitude: String(temple.location?.coordinates?.[0] || "0.0"),
     address_url: String(temple.address_url || ""),
   };
 };
@@ -89,11 +90,11 @@ exports.getRitualsByTemple = async (req, res) => {
             if (/^\d+$/.test(finalName.trim()) && ritual.description) finalName = ritual.description;
 
             return {
-                _id: ritual._id,
+                _id: ritual._id, // 🎯 FIX: Added _id here as well to match Flutter model perfectly
                 id: Number(ritual.sql_id || 0),
                 name: String(finalName),
                 description: String(ritual.description || ""),
-                type: ritual.ritual_type_id ? String(ritual.ritual_type_id.name) : "",
+                type: ritual.ritual_type_id ? String(ritual.ritual_type_id.name) : "General", // 🎯 FIX: No empty strings
                 temple_id: Number(templeDoc.sql_id || 0),
                 temple_name: String(templeDoc.name || ""),
                 image: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
@@ -161,13 +162,15 @@ exports.getRitualShow = async (req, res) => {
         let finalName = ritualDoc.name || "";
         if (/^\d+$/.test(finalName.trim()) && ritualDoc.description) finalName = ritualDoc.description;
 
+        // 🎯 FIX: Added missing _id and removed empty type string as provided
         const data = {
+            _id: ritualDoc._id, 
             id: Number(ritualDoc.sql_id || 0),
             temple_id: Number(templeDoc?.sql_id || requestedTempleId || 0),
             temple_name: String(templeDoc?.name || ""),
             name: String(finalName),
             description: String(ritualDoc.description || ""),
-            type: ritualDoc.ritual_type_id ? String(ritualDoc.ritual_type_id.name) : "",
+            type: ritualDoc.ritual_type_id ? String(ritualDoc.ritual_type_id.name) : "General", 
             image: formatImageUrl(/^\d+$/.test(ritualDoc.image || "") ? "" : ritualDoc.image),
             image_thumb: formatImageUrl(/^\d+$/.test(ritualDoc.image || "") ? "" : ritualDoc.image),
             devotees_booked_count: 0,

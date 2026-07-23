@@ -12,9 +12,9 @@ const mobileBookingController = require('../controllers/mobile/templeBookingMobi
 const mobileTempleBookingController = require('../controllers/mobile/templeBookingMobileController');
 const homeController = require('../controllers/user/homeController');
 
-const mobileRitualBookingController = require('../controllers/mobile/ritualBookingMobileController');
+const mobileRitualBookingController = require('../controllers/mobile/ritualMobileController');
 // At the top of the file, ensure the ritual controller is imported
-const ritualController = require('../controllers/user/ritualController');
+//const ritualController = require('../controllers/user/ritualController');
 
 // --- Middleware ---
 const { protectMobile } = require('../middleware/authMiddleware');

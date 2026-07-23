@@ -1,4 +1,4 @@
-// backend/controllers/mobile/ritualBookingMobileController.js
+// backend/controllers/mobile/ritualMobileController.js
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 const Razorpay = require("razorpay");
@@ -15,6 +15,9 @@ const getRazorpayInstance = () => new Razorpay({
 });
 
 const FLUTTER_MESSAGES = {
+    ritualsFetched: "Rituals fetched successfully.",
+    ritualFetched: "Ritual details fetched successfully.",
+    ritualPackagesFetched: "Ritual packages fetched successfully.",
     ritualBookingSuccess: "Ritual booking created successfully.",
     ritualVerifySuccess: "Ritual booking verified successfully.",
 };
@@ -30,6 +33,110 @@ const sendError = (res, statusCode, message) => {
 const buildQuery = (id) => {
     return mongoose.isValidObjectId(id) ? { _id: id } : { sql_id: Number(id) };
 };
+
+// =========================================================================
+// 1. DATA FETCHING (Public)
+// =========================================================================
+
+exports.getRitualsByTemple = async (req, res) => {
+    try {
+        const mobileTempleId = req.body.temple_id || req.body.templeId;
+
+        if (!mobileTempleId) {
+            return sendError(res, 400, "temple_id is required.");
+        }
+
+        const templeDoc = await Temple.findOne(buildQuery(mobileTempleId)).lean();
+        if (!templeDoc) {
+            return sendError(res, 404, "Temple not found.");
+        }
+
+        const rituals = await Ritual.find({ temple_id: templeDoc._id }).lean();
+
+        const data = rituals.map((ritual) => ({
+            ...ritual,
+            id: Number(ritual.sql_id || 0),
+            temple_id: Number(mobileTempleId),
+        }));
+
+        return res.status(200).json({
+            success: true,
+            status: "true",
+            message: FLUTTER_MESSAGES.ritualsFetched,
+            data
+        });
+    } catch (error) {
+        console.error("📱 Mobile Ritual Index Error:", error.message);
+        return sendError(res, 500, error.message);
+    }
+};
+
+exports.getRitualShow = async (req, res) => {
+    try {
+        const mobileRitualId = req.body.ritual_id || req.body.ritualId;
+
+        if (!mobileRitualId) {
+            return sendError(res, 400, "ritual_id is required.");
+        }
+
+        const ritualDoc = await Ritual.findOne(buildQuery(mobileRitualId)).lean();
+        if (!ritualDoc) {
+            return sendError(res, 404, "Ritual not found.");
+        }
+
+        const data = {
+            ...ritualDoc,
+            id: Number(ritualDoc.sql_id || 0),
+        };
+
+        return res.status(200).json({
+            success: true,
+            status: "true",
+            message: FLUTTER_MESSAGES.ritualFetched,
+            data
+        });
+    } catch (error) {
+        console.error("📱 Mobile Ritual Show Error:", error.message);
+        return sendError(res, 500, error.message);
+    }
+};
+
+exports.getRitualPackages = async (req, res) => {
+    try {
+        const mobileRitualId = req.body.ritual_id || req.body.ritualId;
+
+        if (!mobileRitualId) {
+            return sendError(res, 400, "ritual_id is required.");
+        }
+
+        const ritualDoc = await Ritual.findOne(buildQuery(mobileRitualId)).lean();
+        if (!ritualDoc) {
+            return sendError(res, 404, "Ritual not found.");
+        }
+
+        const packages = await RitualPackage.find({ ritual_id: ritualDoc._id }).lean();
+
+        const data = packages.map((pkg) => ({
+            ...pkg,
+            id: Number(pkg.sql_id || 0),
+            ritual_id: Number(mobileRitualId),
+        }));
+
+        return res.status(200).json({
+            success: true,
+            status: "true",
+            message: FLUTTER_MESSAGES.ritualPackagesFetched,
+            data
+        });
+    } catch (error) {
+        console.error("📱 Mobile Ritual Packages Error:", error.message);
+        return sendError(res, 500, error.message);
+    }
+};
+
+// =========================================================================
+// 2. BOOKING & VERIFICATION (Protected)
+// =========================================================================
 
 exports.initiateRitualBooking = async (req, res) => {
     try {

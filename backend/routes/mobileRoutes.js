@@ -1,20 +1,14 @@
 const express = require('express');
 const router = express.Router();
 
-
 // --- Controllers ---
 const authMobileController = require('../controllers/mobile/authMobileController'); 
-// 🎯 FIX: Updated to usersController
 const usersController = require('../controllers/user/usersController');
 const mobileTempleController = require('../controllers/mobile/templeController'); 
 const membershipMobileController = require('../controllers/mobile/membershipMobileController'); 
-const mobileBookingController = require('../controllers/mobile/templeBookingMobileController');
 const mobileTempleBookingController = require('../controllers/mobile/templeBookingMobileController');
 const homeController = require('../controllers/user/homeController');
-
-const mobileRitualBookingController = require('../controllers/mobile/ritualMobileController');
-// At the top of the file, ensure the ritual controller is imported
-//const ritualController = require('../controllers/user/ritualController');
+const mobileRitualController = require('../controllers/mobile/ritualMobileController');
 
 // --- Middleware ---
 const { protectMobile } = require('../middleware/authMiddleware');
@@ -36,12 +30,11 @@ router.get('/states', mobileTempleController.getPublicStates);
 router.get('/temples', mobileTempleController.getMobileTemples);
 router.get('/temple/index', mobileTempleController.getMobileTemples);
 router.post('/temples/details', mobileTempleController.getMobileTempleById); 
-// Add this line where your other temple routes are:
 router.post('/temple/show', mobileTempleController.getMobileTempleById);
-// 🎯 Mobile Temple Booking Routes
+
+// Mobile Temple Booking Routes
 router.post('/temple/booking', protectMobile, mobileTempleBookingController.initiateTempleBooking);
 router.post('/temple/booking/verify', protectMobile, mobileTempleBookingController.verifyTempleBooking);
-
 
 // Discovery (Public)
 router.get('/membership-plans/active', membershipMobileController.getActiveMembershipPlans);
@@ -62,15 +55,20 @@ router.post('/profile/favorite-temple', protectMobile, usersController.toggleFav
 router.post('/club/subscribe', protectMobile, membershipMobileController.createOrder);
 router.post('/club/verify', protectMobile, membershipMobileController.verifyPayment);
 
-router.post('/bookings/create', protectMobile, mobileBookingController.initiateTempleBooking);
-router.post('/bookings/verify', protectMobile, mobileBookingController.verifyTempleBooking);
+router.post('/bookings/create', protectMobile, mobileTempleBookingController.initiateTempleBooking);
+router.post('/bookings/verify', protectMobile, mobileTempleBookingController.verifyTempleBooking);
 
-router.post('/ritual/index', ritualController.getRitualsByTemple);
-router.post('/ritual/show', ritualController.getRitualShow);
-router.post('/ritual/packages', ritualController.getRitualPackages);
+// =========================================================================
+// 🪔 RITUALS ENGINE (Strictly Mobile Controller)
+// =========================================================================
+// 1. Data Fetching
+router.post('/ritual/index', mobileRitualController.getRitualsByTemple);
+router.post('/ritual/show', mobileRitualController.getRitualShow);
+router.post('/ritual/packages', mobileRitualController.getRitualPackages);
 
-// 2. Booking & Verification Routes (Handled securely by mobileRitualBookingController)
-router.post('/ritual/booking', protectMobile, mobileRitualBookingController.initiateRitualBooking);
-router.post('/ritual/verify-booking', protectMobile, mobileRitualBookingController.verifyRitualBooking);
-router.post('/ritual/verify-payment', protectMobile, mobileRitualBookingController.verifyRitualBooking); // Added fallback alias
+// 2. Booking & Verification Routes
+router.post('/ritual/booking', protectMobile, mobileRitualController.initiateRitualBooking);
+router.post('/ritual/verify-booking', protectMobile, mobileRitualController.verifyRitualBooking);
+router.post('/ritual/verify-payment', protectMobile, mobileRitualController.verifyRitualBooking);
+
 module.exports = router;

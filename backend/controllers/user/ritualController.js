@@ -52,18 +52,19 @@ const buildTempleAddress = (temple) => {
   
   const full_address = [address1, city, state].filter(Boolean).join(", ");
 
+  // 🎯 STRICT STRING COERCION APPLIED HERE
   return {
-    full_address: full_address,
-    address_line1: address1,
-    address_line2: temple.address_line2 || "",
-    landmark: temple.landmark || "",
-    city: city,
-    state: state,
-    pincode: temple.pincode || "",
-    country: temple.country_name || temple.country || "India",
-    latitude: temple.location?.coordinates?.[1] || "", 
-    longitude: temple.location?.coordinates?.[0] || "",
-    address_url: temple.address_url || "",
+    full_address: String(full_address || ""),
+    address_line1: String(address1 || ""),
+    address_line2: String(temple.address_line2 || ""),
+    landmark: String(temple.landmark || ""),
+    city: String(city || ""),
+    state: String(state || ""),
+    pincode: String(temple.pincode || ""), 
+    country: String(temple.country_name || temple.country || "India"),
+    latitude: String(temple.location?.coordinates?.[1] || ""), 
+    longitude: String(temple.location?.coordinates?.[0] || ""),
+    address_url: String(temple.address_url || ""),
   };
 };
 
@@ -145,7 +146,7 @@ exports.getRitualsByTemple = async (req, res) => {
         id: Number(ritual.sql_id) || 0,
         name: String(finalName),
         description: String(ritual.description || ""),
-        type: ritual.ritual_type_id ? String(ritual.ritual_type_id.name) : "", // 🎯 Fixed Null
+        type: ritual.ritual_type_id ? String(ritual.ritual_type_id.name) : "",
         temple_id: Number(temple.sql_id) || 0,
         temple_name: String(temple.name || ""),
         image: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
@@ -216,7 +217,7 @@ exports.getRitualShow = async (req, res) => {
         temple_name: String(temple?.name || ""),
         name: String(finalName),
         description: String(ritual.description || ""),
-        type: ritual.ritual_type_id ? String(ritual.ritual_type_id.name) : "", // 🎯 Fixed Null
+        type: ritual.ritual_type_id ? String(ritual.ritual_type_id.name) : "", 
         image: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
         image_thumb: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
         devotees_booked_count: 0,
@@ -240,7 +241,6 @@ exports.getRitualPackages = async (req, res) => {
     const packages = await RitualPackage.find({ ritual_id: ritual._id, status: { $in: [0, 1] } })
       .sort({ created_at: 1, _id: 1 }).lean();
 
-    // 🎯 Fixed NaN issue crashing the Flutter Json Parser
     let resolvedTempleId = 0;
     if (ritual.temple_id) {
         if (mongoose.isValidObjectId(String(ritual.temple_id))) {

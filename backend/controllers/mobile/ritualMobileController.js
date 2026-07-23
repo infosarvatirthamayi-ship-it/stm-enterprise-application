@@ -9,17 +9,17 @@ const RitualPackage = mongoose.models.RitualPackage || require("../../models/Rit
 const RitualBooking = mongoose.models.RitualBooking || require("../../models/RitualBooking");
 const PurchasedMemberCard = mongoose.models.PurchasedMemberCard || require("../../models/PurchasedMemberCard");
 const formatImageUrl = require("../../utils/imageUrl");
-const Favorite = require("../../models/Favorite");
 
 const getRazorpayInstance = () => new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
+// 🎯 EXACT match to avoid Bloc condition failures
 const FLUTTER_MESSAGES = {
-    ritualsFetched: "Ritual list fetched successfully",
-    ritualFetched: "Ritual fetched successfully",
-    ritualPackagesFetched: "Ritual packages fetched successfully",
+    ritualListSuccess: "Ritual list fetched successfully",
+    ritualShowSuccess: "Ritual fetched successfully",
+    ritualPackageSuccess: "Ritual packages fetched successfully",
     ritualBookingSuccess: "Ritual booking created successfully.",
     ritualVerifySuccess: "Ritual booking verified successfully.",
 };
@@ -36,29 +36,34 @@ const buildQuery = (id) => {
     return mongoose.isValidObjectId(id) ? { _id: id } : { sql_id: Number(id) };
 };
 
+// 🎯 STRICT TYPE COERCION FOR ADDRESS MAPPER
 const buildTempleAddress = (temple) => {
-  if (!temple) return {};
-  
-  const city = temple.city_name || temple.city || "";
-  const state = temple.state_name || temple.state || "";
-  const address1 = temple.address_line1 || "";
-  
-  const full_address = [address1, city, state].filter(Boolean).join(", ");
+    if (!temple) return {};
+    
+    const city = String(temple.city_name || temple.city || "");
+    const state = String(temple.state_name || temple.state || "");
+    const address1 = String(temple.address_line1 || "");
+    const full_address = [address1, city, state].filter(Boolean).join(", ");
 
-  return {
-    full_address: String(full_address || ""),
-    address_line1: String(address1 || ""),
-    address_line2: String(temple.address_line2 || ""),
-    landmark: String(temple.landmark || ""),
-    city: String(city || ""),
-    state: String(state || ""),
-    pincode: String(temple.pincode || ""), 
-    country: String(temple.country_name || temple.country || "India"),
-    // 🎯 FIX: Default to "0.0" so Flutter double.parse() doesn't crash
-    latitude: String(temple.location?.coordinates?.[1] || "0.0"), 
-    longitude: String(temple.location?.coordinates?.[0] || "0.0"),
-    address_url: String(temple.address_url || ""),
-  };
+    // Ensure coordinates are strings. Nulls/empty values safely default to "0.0" 
+    let lat = temple.latitude || temple.location?.coordinates?.[1];
+    let lng = temple.longitude || temple.location?.coordinates?.[0];
+    lat = (lat === undefined || lat === null || lat === "") ? "0.0" : String(lat);
+    lng = (lng === undefined || lng === null || lng === "") ? "0.0" : String(lng);
+
+    return {
+        full_address: full_address,
+        address_line1: address1,
+        address_line2: String(temple.address_line2 || ""),
+        landmark: String(temple.landmark || ""),
+        city: city,
+        state: state,
+        pincode: String(temple.pincode || ""), 
+        country: String(temple.country_name || temple.country || "India"),
+        latitude: lat,
+        longitude: lng,
+        address_url: String(temple.address_url || ""),
+    };
 };
 
 // =========================================================================
@@ -70,18 +75,12 @@ exports.getRitualsByTemple = async (req, res) => {
         const source = { ...req.query, ...req.body };
         const mobileTempleId = source.temple_id || source.templeId;
 
-        if (!mobileTempleId) {
-            return sendError(res, 400, "temple_id is required.");
-        }
+        if (!mobileTempleId) return sendError(res, 400, "temple_id is required.");
 
         const templeDoc = await Temple.findOne(buildQuery(mobileTempleId)).lean();
-        if (!templeDoc) {
-            return sendError(res, 404, "Temple not found.");
-        }
+        if (!templeDoc) return sendError(res, 404, "Temple not found.");
 
-        // Query rituals using the true MongoDB ObjectId of the temple
         const rituals = await Ritual.find({ temple_id: templeDoc._id, status: { $in: [0, 1] } })
-            .populate('ritual_type_id', 'name')
             .sort({ sequence: 1, created_at: -1 })
             .lean();
 
@@ -90,11 +89,9 @@ exports.getRitualsByTemple = async (req, res) => {
             if (/^\d+$/.test(finalName.trim()) && ritual.description) finalName = ritual.description;
 
             return {
-                _id: ritual._id, // 🎯 FIX: Added _id here as well to match Flutter model perfectly
                 id: Number(ritual.sql_id || 0),
                 name: String(finalName),
                 description: String(ritual.description || ""),
-                type: ritual.ritual_type_id ? String(ritual.ritual_type_id.name) : "General", // 🎯 FIX: No empty strings
                 temple_id: Number(templeDoc.sql_id || 0),
                 temple_name: String(templeDoc.name || ""),
                 image: formatImageUrl(/^\d+$/.test(ritual.image || "") ? "" : ritual.image),
@@ -105,11 +102,11 @@ exports.getRitualsByTemple = async (req, res) => {
             };
         });
 
-        // 🎯 EXACT STRUCTURE EXPECTED BY Flutter RitualModel (Data -> data: [])
+        // 🎯 EXACT STRUCTURE FOR RitualModel (Source 19)
         return res.status(200).json({
             success: true,
             status: "true",
-            message: FLUTTER_MESSAGES.ritualsFetched,
+            message: FLUTTER_MESSAGES.ritualListSuccess,
             data: {
                 data: formatted,
                 total_count: formatted.length,
@@ -128,7 +125,6 @@ exports.getRitualsByTemple = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("📱 Mobile Ritual Index Error:", error.message);
         return sendError(res, 500, error.message);
     }
 };
@@ -139,17 +135,10 @@ exports.getRitualShow = async (req, res) => {
         const mobileRitualId = source.ritual_id || source.ritualId;
         const requestedTempleId = source.temple_id || source.templeId;
 
-        if (!mobileRitualId) {
-            return sendError(res, 400, "ritual_id is required.");
-        }
+        if (!mobileRitualId) return sendError(res, 400, "ritual_id is required.");
 
-        const ritualDoc = await Ritual.findOne({ ...buildQuery(mobileRitualId), status: { $in: [0, 1] } })
-            .populate('ritual_type_id', 'name')
-            .lean();
-
-        if (!ritualDoc) {
-            return sendError(res, 404, "Ritual not found.");
-        }
+        const ritualDoc = await Ritual.findOne({ ...buildQuery(mobileRitualId), status: { $in: [0, 1] } }).lean();
+        if (!ritualDoc) return sendError(res, 404, "Ritual not found.");
 
         let templeDoc = null;
         if (ritualDoc.temple_id) {
@@ -162,15 +151,13 @@ exports.getRitualShow = async (req, res) => {
         let finalName = ritualDoc.name || "";
         if (/^\d+$/.test(finalName.trim()) && ritualDoc.description) finalName = ritualDoc.description;
 
-        // 🎯 FIX: Added missing _id and removed empty type string as provided
+        // 🎯 EXACT STRUCTURE FOR RitualShowModel (Source 14)
         const data = {
-            _id: ritualDoc._id, 
             id: Number(ritualDoc.sql_id || 0),
-            temple_id: Number(templeDoc?.sql_id || requestedTempleId || 0),
-            temple_name: String(templeDoc?.name || ""),
             name: String(finalName),
             description: String(ritualDoc.description || ""),
-            type: ritualDoc.ritual_type_id ? String(ritualDoc.ritual_type_id.name) : "General", 
+            temple_id: Number(templeDoc?.sql_id || requestedTempleId || 0),
+            temple_name: String(templeDoc?.name || ""),
             image: formatImageUrl(/^\d+$/.test(ritualDoc.image || "") ? "" : ritualDoc.image),
             image_thumb: formatImageUrl(/^\d+$/.test(ritualDoc.image || "") ? "" : ritualDoc.image),
             devotees_booked_count: 0,
@@ -181,11 +168,10 @@ exports.getRitualShow = async (req, res) => {
         return res.status(200).json({
             success: true,
             status: "true",
-            message: FLUTTER_MESSAGES.ritualFetched,
+            message: FLUTTER_MESSAGES.ritualShowSuccess,
             data
         });
     } catch (error) {
-        console.error("📱 Mobile Ritual Show Error:", error.message);
         return sendError(res, 500, error.message);
     }
 };
@@ -195,45 +181,48 @@ exports.getRitualPackages = async (req, res) => {
         const source = { ...req.query, ...req.body };
         const mobileRitualId = source.ritual_id || source.ritualId;
 
-        if (!mobileRitualId) {
-            return sendError(res, 400, "ritual_id is required.");
-        }
+        if (!mobileRitualId) return sendError(res, 400, "ritual_id is required.");
 
         const ritualDoc = await Ritual.findOne({ ...buildQuery(mobileRitualId), status: { $in: [0, 1] } }).lean();
-        if (!ritualDoc) {
-            return sendError(res, 404, "Ritual not found.");
-        }
+        if (!ritualDoc) return sendError(res, 404, "Ritual not found.");
 
         const packages = await RitualPackage.find({ ritual_id: ritualDoc._id, status: { $in: [0, 1] } })
             .sort({ created_at: 1, _id: 1 })
             .lean();
 
-        let resolvedTempleId = 0;
-        if (ritualDoc.temple_id) {
-            const t = await Temple.findById(ritualDoc.temple_id).select("sql_id").lean();
-            resolvedTempleId = t ? Number(t.sql_id || 0) : 0;
-        }
-
         const formatted = packages.map((pkg) => ({
             id: Number(pkg.sql_id || 0),
             ritual_id: Number(ritualDoc.sql_id || 0),
-            temple_id: resolvedTempleId,
             name: String(pkg.name || ""),
             description: String(pkg.description || ""),
             devotees_count: Number(pkg.devotees_count || 1),
             price: String(pkg.price || 0),
-            offer_price: String(pkg.offer_price || pkg.price || 0),
         }));
 
-        // 🎯 EXACT STRUCTURE EXPECTED BY Flutter RitualPackageModel (Data -> data: [])
+        // 🎯 EXACT STRUCTURE FOR RitualPackageModel (Source 17)
+        // Note: Re-added the pagination fields which were missing and causing crashes.
         return res.status(200).json({
             success: true,
             status: "true",
-            message: FLUTTER_MESSAGES.ritualPackagesFetched,
-            data: { data: formatted }
+            message: FLUTTER_MESSAGES.ritualPackageSuccess,
+            data: {
+                data: formatted,
+                total_count: formatted.length,
+                is_next: false,
+                is_prev: false,
+                total_pages: 1,
+                current_page: 1,
+                per_page: formatted.length,
+                from: formatted.length ? 1 : 0,
+                to: formatted.length,
+                next_page_url: null,
+                prev_page_url: null,
+                path: req.originalUrl,
+                has_pages: false,
+                links: [],
+            }
         });
     } catch (error) {
-        console.error("📱 Mobile Ritual Packages Error:", error.message);
         return sendError(res, 500, error.message);
     }
 };
@@ -316,6 +305,7 @@ exports.initiateRitualBooking = async (req, res) => {
             purchased_member_card_id: activeMembership ? activeMembership._id : null
         });
 
+        // 🎯 EXACT STRUCTURE FOR RitualBookingModel (Source 15)
         return res.status(200).json({
             success: true,
             status: "true",
@@ -331,12 +321,13 @@ exports.initiateRitualBooking = async (req, res) => {
                 devotees_name: String(booking.devotees_name),
                 wish: String(booking.wish),
                 booking_status: 1,
-                offer_discount_amount: booking.offer_discount_amount.toString(), 
-                original_amount: booking.original_amount.toString(),             
-                paid_amount: booking.paid_amount.toString(),                     
+                offer_discount_amount: String(booking.offer_discount_amount), 
+                original_amount: String(booking.original_amount),             
+                paid_amount: String(booking.paid_amount),                     
                 offer_id: Number(offerId),
                 payment: {
                     razorpay_order_id: order ? String(order.id) : "",
+                    razorpay_payment_id: "",
                     razorpay_public_key: String(process.env.RAZORPAY_KEY_ID || ""),
                     payment_status: 1,
                     payment_type: Number(paymentType),
@@ -345,7 +336,6 @@ exports.initiateRitualBooking = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("📱 Mobile Ritual Checkout Error:", error.message);
         return sendError(res, 500, error.message);
     }
 };
@@ -380,16 +370,30 @@ exports.verifyRitualBooking = async (req, res) => {
             await booking.save();
         }
 
+        // 🎯 EXACT STRUCTURE FOR RitualVerifyPaymentModel (Source 18)
         return res.status(200).json({
             success: true,
             status: "true",
             message: FLUTTER_MESSAGES.ritualVerifySuccess,
             data: {
                 id: Number(booking.sql_id || Date.now()),
+                user_id: Number(booking.user_id || 0),
+                temple_id: Number(booking.temple_id || 0),
+                ritual_id: Number(booking.ritual_id || 0),
+                ritual_package_id: Number(booking.ritual_package_id || 0),
+                date: booking.date ? booking.date.toISOString() : null,
+                whatsapp_number: String(booking.whatsapp_number || ""),
+                devotees_name: String(booking.devotees_name || ""),
+                wish: String(booking.wish || ""),
                 booking_status: 2,
+                offer_discount_amount: String(booking.offer_discount_amount || "0"),
+                original_amount: String(booking.original_amount || "0"),
+                paid_amount: String(booking.paid_amount || "0"),
+                offer_id: 0,
                 payment: {
                     razorpay_order_id: razorpay_order_id,
                     razorpay_payment_id: razorpay_payment_id,
+                    razorpay_public_key: String(process.env.RAZORPAY_KEY_ID || ""),
                     payment_status: 2,
                     payment_type: 2,
                     payment_date: booking.payment_date.toISOString()
@@ -397,7 +401,6 @@ exports.verifyRitualBooking = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("📱 Mobile Ritual Verification Error:", error.message);
         return sendError(res, 500, error.message);
     }
 };

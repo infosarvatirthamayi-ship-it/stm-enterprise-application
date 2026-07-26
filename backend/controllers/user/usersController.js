@@ -258,9 +258,10 @@ exports.updateProfile = async (req, res) => {
     if (last_name) user.last_name = last_name;
     if (email) user.email = email.toLowerCase();
     if (gender) user.gender = gender;
+    
+    // Safely handle empty dates from frontend to prevent Mongoose CastErrors
     if (date_of_birth) user.date_of_birth = date_of_birth; 
     
-    // 🌍 GLOBAL FIX: Format updated profile number correctly
     if (mobile_number) {
         let cleanMobile = String(mobile_number).replace(/[^\d+]/g, "");
         if (!cleanMobile.startsWith('+')) cleanMobile = `+${cleanMobile}`;
@@ -270,15 +271,22 @@ exports.updateProfile = async (req, res) => {
     if (remove_profile_picture === 'true') user.profile_picture = "";
     if (remove_banner_image === 'true') user.banner_image = "";
 
-    if (req.files?.profile_picture) user.profile_picture = req.files.profile_picture[0].path;
-    if (req.files?.banner_image) user.banner_image = req.files.banner_image[0].path;
+    // 🛡️ THE FIX: Safely parse multer's arrays and FORCE web-safe forward slashes!
+    if (req.files && req.files.profile_picture && req.files.profile_picture.length > 0) {
+        user.profile_picture = req.files.profile_picture[0].path.replace(/\\/g, "/");
+    }
+    
+    if (req.files && req.files.banner_image && req.files.banner_image.length > 0) {
+        user.banner_image = req.files.banner_image[0].path.replace(/\\/g, "/");
+    }
 
     await user.save();
     return res.status(200).json({ status: "true", data: serializeUser(user) });
     
   } catch (error) { 
     console.error("🔥 PROFILE UPDATE CRASH:", error); 
-    return res.status(500).json({ status: "false", message: error.message }); 
+    // Send the exact error back to the frontend so we don't have to guess!
+    return res.status(500).json({ status: "false", message: error.message || "Internal Server Error" }); 
   }
 };
 

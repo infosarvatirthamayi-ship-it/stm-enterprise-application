@@ -4,19 +4,23 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:50
 export const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || 'http://localhost:5000';
 export const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
-    export const getFullImageUrl = (imagePath) => {
+export const getFullImageUrl = (imagePath) => {
   if (!imagePath) return 'https://images.unsplash.com/photo-1545641203-7d072a14e3b2?q=80&w=800';
   
   const baseUrl = IMAGE_BASE_URL.replace(/\/$/, ""); 
 
-  // 🎯 THE FIX: Intercept hardcoded production URLs and force them to localhost during dev
-  if (imagePath.startsWith('http')) {
-      if (baseUrl.includes('localhost') && imagePath.includes('api.sarvatirthamayi.com')) {
-          return imagePath.replace('https://api.sarvatirthamayi.com', baseUrl);
+  // 🎯 THE FIX: Convert any Windows backslashes to web-safe forward-slashes FIRST
+  const webSafePath = imagePath.replace(/\\/g, "/");
+        
+  // Now we check 'webSafePath' instead of 'imagePath'
+  if (webSafePath.startsWith('http')) {
+      if (baseUrl.includes('localhost') && webSafePath.includes('api.sarvatirthamayi.com')) {
+          return webSafePath.replace('https://api.sarvatirthamayi.com', baseUrl);
       }
-      return imagePath;
+      return webSafePath;
   }
 
-  const cleanPath = imagePath.replace(/^\//, "");
+  // Clean any leading slashes from 'webSafePath' before combining
+  const cleanPath = webSafePath.replace(/^\//, "");
   return `${baseUrl}/${cleanPath}`;
 };

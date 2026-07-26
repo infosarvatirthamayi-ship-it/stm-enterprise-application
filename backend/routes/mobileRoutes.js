@@ -44,9 +44,6 @@ router.get('/membership-plans/active', membershipMobileController.getActiveMembe
 // 👤 PROTECTED MOBILE ROUTES (Profile & Vault)
 // =========================================================================
 
-// Profile Management
-router.get('/profile', protectMobile, usersController.getProfile);
-router.post('/profile/update', protectMobile, usersController.updateProfile);
 
 // Profile Management
 router.get('/profile', protectMobile, mobileProfileController.getMobileProfile);

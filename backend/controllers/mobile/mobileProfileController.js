@@ -1,6 +1,5 @@
-// controllers/mobile/mobileProfileController.js
 const User = require("../../models/User");
-const { getFullImageUrl } = require("../../utils/config"); // Ensure this is imported
+const { getFullImageUrl } = require("../../utils/config");
 
 // --- 🧠 MOBILE-SPECIFIC SERIALIZER ---
 const serializeMobileUser = (user) => {
@@ -23,14 +22,25 @@ const serializeMobileUser = (user) => {
 };
 
 // --- MOBILE LOGIN ---
-// --- MOBILE LOGIN ---
 exports.loginMobile = async (req, res) => {
   try {
     const { mobile_number, password } = req.body;
-    const cleanMobile = String(mobile_number).replace(/\D/g, "").slice(-10);
+    
+    // 🌍 THE FIX: Ultimate Master Query for mobile login
+    const cleanMobile = String(mobile_number).replace(/[^\d+]/g, ""); 
+    const rawDigits = cleanMobile.replace('+', '');
+    
+    const query = { 
+        $or: [
+            { mobile_number: cleanMobile },                            
+            { mobile_number: `+${rawDigits}` },                     
+            { mobile_number: rawDigits },                    
+            { mobile_number: rawDigits.slice(-10) } 
+        ] 
+    };
 
-    const user = await User.findOne({ mobile_number: cleanMobile });
-    // 🎯 ADDED: Security check for verification status
+    const user = await User.findOne(query);
+    
     if (!user || !(await user.matchPassword(password))) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
@@ -49,6 +59,7 @@ exports.loginMobile = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
 // --- MOBILE PROFILE FETCH ---
 exports.getMobileProfile = async (req, res) => {
   try {
@@ -70,7 +81,7 @@ exports.updateMobileProfile = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    // Map incoming camelCase from Flutter
+    // Map incoming camelCase from Flutter/React Native
     const { firstName, lastName, email, mobileNumber, dateOfBirth, gender } = req.body;
     
     if (firstName) user.first_name = firstName;
@@ -78,12 +89,22 @@ exports.updateMobileProfile = async (req, res) => {
     if (email) user.email = email.toLowerCase();
     if (dateOfBirth) user.date_of_birth = dateOfBirth;
     if (gender) user.gender = gender;
-    if (mobileNumber) user.mobile_number = mobileNumber.replace(/\D/g, "").slice(-10);
+    
+    // 🌍 THE FIX: Keep mobile number format consistent with the web DB
+    if (mobileNumber) {
+        let cleanMobile = String(mobileNumber).replace(/[^\d+]/g, "");
+        if (!cleanMobile.startsWith('+')) cleanMobile = `+${cleanMobile}`;
+        user.mobile_number = cleanMobile;
+    }
 
-    // Handle File Uploads (Assuming Multer is configured on the mobile route)
+    // 🛡️ THE FIX: Safely parse multer arrays and format web-safe paths
     if (req.files) {
-      if (req.files.profilePicture) user.profile_picture = req.files.profilePicture[0].path;
-      if (req.files.bannerImage) user.banner_image = req.files.bannerImage[0].path;
+        if (req.files.profilePicture && req.files.profilePicture.length > 0) {
+            user.profile_picture = req.files.profilePicture[0].path.replace(/\\/g, "/");
+        }
+        if (req.files.bannerImage && req.files.bannerImage.length > 0) {
+            user.banner_image = req.files.bannerImage[0].path.replace(/\\/g, "/");
+        }
     }
 
     await user.save();

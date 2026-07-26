@@ -1,7 +1,8 @@
 const User = require("../../models/User");
 const { getFullImageUrl } = require("../../utils/config");
 
-// --- 🧠 MOBILE-SPECIFIC SERIALIZER ---
+// --- 🧠 FLUTTER-ALIGNED SERIALIZER ---
+// Custom-built for GetProfileModel & MyProfileScreen UI
 const serializeMobileUser = (user) => {
   if (!user) return null;
   
@@ -9,15 +10,19 @@ const serializeMobileUser = (user) => {
     id: user._id.toString(),
     userId: String(user.sql_id || 0),
     userType: String(user.user_type || "3"),
+    role: user.role || "user",
+    
+    // CamelCase keys for Flutter UI:
     firstName: user.first_name || "",
     lastName: user.last_name || "",
     email: user.email || "",
     mobileNumber: user.mobile_number || "",
-    profilePicture: user.profile_picture ? getFullImageUrl(user.profile_picture) : "",
-    bannerImage: user.banner_image ? getFullImageUrl(user.banner_image) : "",
     dateOfBirth: user.date_of_birth || "",
     gender: String(user.gender || "1"),
-    role: user.role || "user"
+    profilePicture: user.profile_picture ? getFullImageUrl(user.profile_picture) : "",
+    
+    // Snake_case key specifically required by my_profile_screen.dart:
+    banner_image: user.banner_image ? getFullImageUrl(user.banner_image) : ""
   };
 };
 
@@ -26,7 +31,6 @@ exports.loginMobile = async (req, res) => {
   try {
     const { mobile_number, password } = req.body;
     
-    // 🌍 THE FIX: Ultimate Master Query for mobile login
     const cleanMobile = String(mobile_number).replace(/[^\d+]/g, ""); 
     const rawDigits = cleanMobile.replace('+', '');
     
@@ -42,21 +46,22 @@ exports.loginMobile = async (req, res) => {
     const user = await User.findOne(query);
     
     if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
+      return res.status(401).json({ status: "false", message: "Invalid credentials" });
     }
     if (!user.is_verified) {
-      return res.status(401).json({ success: false, message: "Account unverified." });
+      return res.status(401).json({ status: "false", message: "Account unverified." });
     }
 
     const token = require("jsonwebtoken").sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "30d" });
 
     return res.status(200).json({
-      success: true,
+      status: "true",
+      message: "Login successful.",
       token,
       data: serializeMobileUser(user)
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ status: "false", message: error.message });
   }
 };
 
@@ -64,14 +69,16 @@ exports.loginMobile = async (req, res) => {
 exports.getMobileProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).lean();
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (!user) return res.status(404).json({ status: "false", message: "User not found" });
 
     return res.status(200).json({
-      success: true,
+      status: "true",
+      // 🎯 EXACT MATCH for Constants.profileSuccessMsg
+      message: "Profile retrieved successfully.", 
       data: serializeMobileUser(user)
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ status: "false", message: error.message });
   }
 };
 
@@ -79,37 +86,41 @@ exports.getMobileProfile = async (req, res) => {
 exports.updateMobileProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (!user) return res.status(404).json({ status: "false", message: "User not found" });
 
-    // Map incoming camelCase from Flutter/React Native
-    const { firstName, lastName, email, mobileNumber, dateOfBirth, gender } = req.body;
+    // The Flutter BLoC sends these as snake_case in the updateProfile payload
+    const { first_name, last_name, email, mobile_number, date_of_birth, gender } = req.body;
     
-    if (firstName) user.first_name = firstName;
-    if (lastName) user.last_name = lastName;
+    if (first_name) user.first_name = first_name;
+    if (last_name) user.last_name = last_name;
     if (email) user.email = email.toLowerCase();
-    if (dateOfBirth) user.date_of_birth = dateOfBirth;
+    if (date_of_birth) user.date_of_birth = date_of_birth;
     if (gender) user.gender = gender;
     
-    // 🌍 THE FIX: Keep mobile number format consistent with the web DB
-    if (mobileNumber) {
-        let cleanMobile = String(mobileNumber).replace(/[^\d+]/g, "");
+    if (mobile_number) {
+        let cleanMobile = String(mobile_number).replace(/[^\d+]/g, "");
         if (!cleanMobile.startsWith('+')) cleanMobile = `+${cleanMobile}`;
         user.mobile_number = cleanMobile;
     }
 
-    // 🛡️ THE FIX: Safely parse multer arrays and format web-safe paths
+    // Parse Multer arrays with web-safe forward slashes
     if (req.files) {
-        if (req.files.profilePicture && req.files.profilePicture.length > 0) {
-            user.profile_picture = req.files.profilePicture[0].path.replace(/\\/g, "/");
+        if (req.files.profile_picture && req.files.profile_picture.length > 0) {
+            user.profile_picture = req.files.profile_picture[0].path.replace(/\\/g, "/");
         }
-        if (req.files.bannerImage && req.files.bannerImage.length > 0) {
-            user.banner_image = req.files.bannerImage[0].path.replace(/\\/g, "/");
+        if (req.files.banner_image && req.files.banner_image.length > 0) {
+            user.banner_image = req.files.banner_image[0].path.replace(/\\/g, "/");
         }
     }
 
     await user.save();
-    return res.status(200).json({ success: true, data: serializeMobileUser(user) });
+    return res.status(200).json({ 
+        status: "true", 
+        // 🎯 EXACT MATCH for Constants.profileUpdateSuccessMsg
+        message: "Profile updated successfully.", 
+        data: serializeMobileUser(user) 
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ status: "false", message: error.message });
   }
 };

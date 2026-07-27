@@ -64,6 +64,7 @@ router.post('/bookings/verify', protectMobile, mobileTempleBookingController.ver
 router.post('/ritual/index', mobileRitualController.getRitualsByTemple);
 router.post('/ritual/show', mobileRitualController.getRitualShow);
 router.post('/ritual/packages', mobileRitualController.getRitualPackages);
+router.get('/ritual/booking-details', protectMobile, mobileRitualController.getBookingDetails);
 
 // 2. Booking & Verification Routes
 router.post('/ritual/booking', protectMobile, mobileRitualController.initiateRitualBooking);

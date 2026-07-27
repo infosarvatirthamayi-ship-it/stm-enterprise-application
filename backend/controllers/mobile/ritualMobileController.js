@@ -397,3 +397,20 @@ exports.verifyRitualBooking = async (req, res) => {
         return sendError(res, 500, error.message);
     }
 };
+
+// --- RITUAL BOOKING DETAILS ---
+exports.getBookingDetails = async (req, res) => {
+  try {
+    // TODO: Later, fetch real ritual booking data from your database here.
+    
+    return res.status(200).json({
+      status: "true",
+      success: true,
+      message: "Ritual booking details retrieved successfully.",
+      // 🎯 THE KILL-SHOT: Dart strictly wants a Map (Object), so we send an empty one to stop the crash!
+      data: {} 
+    });
+  } catch (error) {
+    return res.status(500).json({ status: "false", message: error.message });
+  }
+};

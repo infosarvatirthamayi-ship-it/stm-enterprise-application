@@ -11,6 +11,8 @@ const mobileTempleBookingController = require('../controllers/mobile/templeBooki
 const homeController = require('../controllers/user/homeController');
 const mobileRitualController = require('../controllers/mobile/ritualMobileController');
 
+const favoriteController = require('../controllers/mobile/favoriteController');
+
 // --- Middleware ---
 const { protectMobile } = require('../middleware/authMiddleware');
 
@@ -67,5 +69,9 @@ router.post('/ritual/packages', mobileRitualController.getRitualPackages);
 router.post('/ritual/booking', protectMobile, mobileRitualController.initiateRitualBooking);
 router.post('/ritual/verify-booking', protectMobile, mobileRitualController.verifyRitualBooking);
 router.post('/ritual/verify-payment', protectMobile, mobileRitualController.verifyRitualBooking);
+
+// Favorite Routes
+router.get('/favorite/index', protectMobile, favoriteController.getFavorites);
+router.post('/favorite', protectMobile, favoriteController.toggleFavorite);
 
 module.exports = router;

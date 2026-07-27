@@ -13,6 +13,9 @@ const mobileRitualController = require('../controllers/mobile/ritualMobileContro
 
 const favoriteController = require('../controllers/mobile/favoriteController');
 
+
+const mobileEventController = require('../controllers/mobile/mobileEventController');
+
 // --- Middleware ---
 const { protectMobile } = require('../middleware/authMiddleware');
 
@@ -38,6 +41,15 @@ router.post('/temple/show', mobileTempleController.getMobileTempleById);
 // Mobile Temple Booking Routes
 router.post('/temple/booking', protectMobile, mobileTempleBookingController.initiateTempleBooking);
 router.post('/temple/booking/verify', protectMobile, mobileTempleBookingController.verifyTempleBooking);
+
+// Add these temporarily so Flutter receives a 200 Success instead of a 404 crash!
+router.get('/temple/booking-details', protectMobile, (req, res) => {
+    res.status(200).json({ status: "true", success: true, data: {} });
+});
+
+router.get('/donation/booking-details', protectMobile, (req, res) => {
+    res.status(200).json({ status: "true", success: true, data: {} });
+});
 
 // Discovery (Public)
 router.get('/membership-plans/active', membershipMobileController.getActiveMembershipPlans);
@@ -75,4 +87,6 @@ router.post('/ritual/verify-payment', protectMobile, mobileRitualController.veri
 router.get('/favorite/index', protectMobile, favoriteController.getFavorites);
 router.post('/favorite', protectMobile, favoriteController.toggleFavorite);
 
+
+router.get('/event/booking-details', protectMobile, mobileEventController.getBookingDetails);
 module.exports = router;

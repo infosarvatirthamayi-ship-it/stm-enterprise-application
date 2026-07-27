@@ -6,20 +6,21 @@ const serializeMobileUser = (user) => {
   if (!user) return null;
   
   return {
-    id: user._id.toString(),
-    // 🎯 THE FIX: Force these strictly to Numbers (Integers) for Dart!
-    userId: Number(user.sql_id || 0), 
-    userType: Number(user.user_type || 3), 
-    gender: Number(user.gender || 1), 
+    // 🎯 userId MUST be a Number (Integer)
+    userId: Number(user.sql_id) || 0,
     
-    role: user.role || "user",
-    firstName: user.first_name || "",
-    lastName: user.last_name || "",
-    email: user.email || "",
-    mobileNumber: user.mobile_number || "",
-    dateOfBirth: user.date_of_birth || "",
-    profilePicture: user.profile_picture ? getFullImageUrl(user.profile_picture) : "",
-    banner_image: user.banner_image ? getFullImageUrl(user.banner_image) : ""
+    // 🎯 EVERYTHING else must be explicitly wrapped in String() to prevent the Dart crash
+    id: String(user._id || ""),
+    userType: String(user.user_type || "3"), // FIX: Cast to String
+    gender: String(user.gender || "1"),      // FIX: Cast to String
+    role: String(user.role || "user"),
+    firstName: String(user.first_name || ""),
+    lastName: String(user.last_name || ""),
+    email: String(user.email || ""),
+    mobileNumber: String(user.mobile_number || ""),
+    dateOfBirth: String(user.date_of_birth || ""),
+    profilePicture: user.profile_picture ? String(getFullImageUrl(user.profile_picture)) : "",
+    banner_image: user.banner_image ? String(getFullImageUrl(user.banner_image)) : ""
   };
 };
 

@@ -47,7 +47,7 @@ router.get('/membership-plans/active', membershipMobileController.getActiveMembe
 
 // Profile Management
 router.get('/profile', protectMobile, mobileProfileController.getMobileProfile);
-router.post('/profile/update', protectMobile, mobileProfileController.updateMobileProfile);
+router.post('/profile', protectMobile, mobileProfileController.updateMobileProfile);
 // 💳 Checkout Engine (Mobile BFF - Razorpay Handshake)
 router.post('/club/subscribe', protectMobile, membershipMobileController.createOrder);
 router.post('/club/verify', protectMobile, membershipMobileController.verifyPayment);

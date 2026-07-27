@@ -2,26 +2,23 @@ const User = require("../../models/User");
 const { getFullImageUrl } = require("../../utils/config");
 
 // --- 🧠 FLUTTER-ALIGNED SERIALIZER ---
-// Custom-built for GetProfileModel & MyProfileScreen UI
 const serializeMobileUser = (user) => {
   if (!user) return null;
   
   return {
     id: user._id.toString(),
-    userId: String(user.sql_id || 0),
-    userType: String(user.user_type || "3"),
-    role: user.role || "user",
+    // 🎯 THE FIX: Force these strictly to Numbers (Integers) for Dart!
+    userId: Number(user.sql_id || 0), 
+    userType: Number(user.user_type || 3), 
+    gender: Number(user.gender || 1), 
     
-    // CamelCase keys for Flutter UI:
+    role: user.role || "user",
     firstName: user.first_name || "",
     lastName: user.last_name || "",
     email: user.email || "",
     mobileNumber: user.mobile_number || "",
     dateOfBirth: user.date_of_birth || "",
-    gender: String(user.gender || "1"),
     profilePicture: user.profile_picture ? getFullImageUrl(user.profile_picture) : "",
-    
-    // Snake_case key specifically required by my_profile_screen.dart:
     banner_image: user.banner_image ? getFullImageUrl(user.banner_image) : ""
   };
 };
@@ -56,6 +53,7 @@ exports.loginMobile = async (req, res) => {
 
     return res.status(200).json({
       status: "true",
+      success: true,
       message: "Login successful.",
       token,
       data: serializeMobileUser(user)
@@ -73,8 +71,8 @@ exports.getMobileProfile = async (req, res) => {
 
     return res.status(200).json({
       status: "true",
-      // 🎯 EXACT MATCH for Constants.profileSuccessMsg
-      message: "Profile retrieved successfully.", 
+      success: true,
+      message: "Profile retrieved successfully.",
       data: serializeMobileUser(user)
     });
   } catch (error) {
@@ -88,7 +86,6 @@ exports.updateMobileProfile = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ status: "false", message: "User not found" });
 
-    // The Flutter BLoC sends these as snake_case in the updateProfile payload
     const { first_name, last_name, email, mobile_number, date_of_birth, gender } = req.body;
     
     if (first_name) user.first_name = first_name;
@@ -103,7 +100,6 @@ exports.updateMobileProfile = async (req, res) => {
         user.mobile_number = cleanMobile;
     }
 
-    // Parse Multer arrays with web-safe forward slashes
     if (req.files) {
         if (req.files.profile_picture && req.files.profile_picture.length > 0) {
             user.profile_picture = req.files.profile_picture[0].path.replace(/\\/g, "/");
@@ -115,8 +111,8 @@ exports.updateMobileProfile = async (req, res) => {
 
     await user.save();
     return res.status(200).json({ 
-        status: "true", 
-        // 🎯 EXACT MATCH for Constants.profileUpdateSuccessMsg
+        status: "true",
+        success: true,
         message: "Profile updated successfully.", 
         data: serializeMobileUser(user) 
     });

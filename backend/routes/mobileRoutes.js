@@ -7,7 +7,7 @@ const usersController = require('../controllers/user/usersController');
 
 const mobileProfileController = require('../controllers/mobile/mobileProfileController');const mobileTempleController = require('../controllers/mobile/templeController'); 
 
-const userPrivacyController = require('../user/privacyController');
+const userPrivacyController = require('../controllers/user/privacyController');
 
 const membershipMobileController = require('../controllers/mobile/membershipMobileController'); 
 const mobileTempleBookingController = require('../controllers/mobile/templeBookingMobileController');

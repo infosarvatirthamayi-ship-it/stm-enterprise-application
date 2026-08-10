@@ -11,6 +11,8 @@ const userPrivacyController = require('../controllers/user/privacyController');
 
 const termsController = require('../controllers/user/termsController');
 
+const aboutController = require('../controllers/user/aboutController');
+
 const membershipMobileController = require('../controllers/mobile/membershipMobileController'); 
 const mobileTempleBookingController = require('../controllers/mobile/templeBookingMobileController');
 const homeController = require('../controllers/user/homeController');
@@ -73,6 +75,10 @@ router.get('/privacy-policy', protectMobile, userPrivacyController.getPrivacyPol
 
 // Terms and Conditions Route
 router.get('/term-condition', protectMobile, termsController.getTermsAndConditions);
+
+// About Us Route
+router.get('/about-us', protectMobile, aboutController.getAboutUs);
+
 // 💳 Checkout Engine (Mobile BFF - Razorpay Handshake)
 router.post('/club/subscribe', protectMobile, membershipMobileController.createOrder);
 router.post('/club/verify', protectMobile, membershipMobileController.verifyPayment);

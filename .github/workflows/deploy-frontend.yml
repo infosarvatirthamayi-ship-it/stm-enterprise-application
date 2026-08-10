@@ -1,32 +1,26 @@
-name: Deploy Full Stack
+name: Deploy Frontend
 on:
   push:
     branches:
       - main
+    paths:
+      - 'frontend/**' 
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to Server
+      - name: Deploy Frontend to Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROD_SERVER_IP }}
           username: ${{ secrets.PROD_SERVER_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
-            # 1. Update and Build Frontend
             echo "📦 Pulling and Building Frontend..."
             cd /var/www/sarvatirthamayi_site/frontend
-            git pull origin main
+            git fetch --all
+            git reset --hard origin/main
             npm install
             npm run build
-
-            # 2. Update and Restart Backend
-            echo "⚙️ Pulling and Restarting Backend..."
-            cd /var/www/sarvatirthamayi_site/backend
-            git pull origin main
-            npm install
-            pm2 restart all
-
-            echo "✅ Deployment Completely Successful!"
+            echo "✅ Frontend Deployment Completely Successful! (Backend was left untouched)"

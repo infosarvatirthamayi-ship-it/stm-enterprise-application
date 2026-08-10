@@ -72,8 +72,7 @@ router.post('/profile', protectMobile, mobileProfileController.updateMobileProfi
 router.get('/privacy-policy', protectMobile, userPrivacyController.getPrivacyPolicy);
 
 // Terms and Conditions Route
-router.get('/terms-and-conditions', protectMobile, termsController.getTermsAndConditions);
-
+router.get('/term-condition', protectMobile, termsController.getTermsAndConditions);
 // 💳 Checkout Engine (Mobile BFF - Razorpay Handshake)
 router.post('/club/subscribe', protectMobile, membershipMobileController.createOrder);
 router.post('/club/verify', protectMobile, membershipMobileController.verifyPayment);

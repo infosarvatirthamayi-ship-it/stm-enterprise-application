@@ -4,7 +4,6 @@ const router = express.Router();
 // --- Controllers ---
 const authMobileController = require('../controllers/mobile/authMobileController'); 
 
-const authController = require('../controllers/auth.controller'); // Make sure the filename matches your actual controller file!
 
 const usersController = require('../controllers/user/usersController');
 
@@ -32,13 +31,16 @@ const { protectMobile } = require('../middleware/authMiddleware');
 // =========================================================================
 // 📱 MOBILE AUTHENTICATION LAYER
 // =========================================================================
-//router.post('/login', authMobileController.login);
-router.post('/signup', authController.signUp);
-router.post('/login', authController.loginMobile)
-
-//router.post('/signup', authMobileController.signUp);
+router.post('/login', authMobileController.login);
+router.post('/signup', authMobileController.signUp);
 router.post('/verify-otp', authMobileController.verifyOtp); 
 router.post('/resend-otp', authMobileController.resendOtp); 
+
+// Password Recovery
+router.post('/forgot-password', authMobileController.forgotPassword);
+router.post('/forgot-verify-otp', authMobileController.forgotVerifyOtp);
+router.post('/reset-password', authMobileController.resetPassword);
+
 router.post('/logout', protectMobile, authMobileController.logout);
 
 // =========================================================================

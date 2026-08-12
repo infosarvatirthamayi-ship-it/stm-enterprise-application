@@ -3,6 +3,9 @@ const router = express.Router();
 
 // --- Controllers ---
 const authMobileController = require('../controllers/mobile/authMobileController'); 
+
+const authController = require('../controllers/auth.controller'); // Make sure the filename matches your actual controller file!
+
 const usersController = require('../controllers/user/usersController');
 
 const mobileProfileController = require('../controllers/mobile/mobileProfileController');const mobileTempleController = require('../controllers/mobile/templeController'); 
@@ -29,8 +32,11 @@ const { protectMobile } = require('../middleware/authMiddleware');
 // =========================================================================
 // 📱 MOBILE AUTHENTICATION LAYER
 // =========================================================================
-router.post('/login', authMobileController.login);
-router.post('/signup', authMobileController.signUp);
+//router.post('/login', authMobileController.login);
+router.post('/signup', authController.signUp);
+router.post('/login', authController.loginMobile)
+
+//router.post('/signup', authMobileController.signUp);
 router.post('/verify-otp', authMobileController.verifyOtp); 
 router.post('/resend-otp', authMobileController.resendOtp); 
 router.post('/logout', protectMobile, authMobileController.logout);

@@ -202,7 +202,11 @@ exports.signUp = async (req, res) => {
             status: "true",
             success: true,
             message: "Verification profile created. Authorization tokens dispatched.",
-            data: { id: user._id.toString(), userId: user._id.toString() }
+            data: { id: user._id.toString(), userId: user._id.toString(), 
+                first_name: user.first_name,
+                mobile_number: user.mobile_number,
+                email: user.email 
+            }
         });
     } catch (error) {
         if (handleDuplicateKeyError(error, res)) return;
@@ -286,7 +290,10 @@ exports.forgotPassword = async (req, res) => {
 
         return res.status(200).json({
             status: "true", success: true, message: "Recovery credentials dispatched.",
-            data: { id: user._id.toString(), userId: user._id.toString() }
+            data: { id: user._id.toString(), userId: user._id.toString(), 
+                first_name: user.first_name,
+                mobile_number: user.mobile_number
+             }
         });
     } catch (error) {
         return res.status(500).json({ status: "false", message: "Server recovery pipeline error" });

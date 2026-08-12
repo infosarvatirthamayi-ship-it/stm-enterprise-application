@@ -220,10 +220,20 @@ exports.resendOtp = async (req, res) => {
 
 exports.forgotPassword = async (req, res) => {
     try {
-        const email = normalizeEmail(req.body.email);
-        const mobile = normalizeMobile(req.body.mobile_number || req.body.mobileNo);
+        const rawEmail = req.body.email;
+        const rawMobile = req.body.mobile_number || req.body.mobileNo;
 
-        let user = email ? await User.findOne({ email }) : await User.findOne({ mobile_number: mobile });
+        let user;
+
+        if (rawEmail) {
+            const email = normalizeEmail(rawEmail);
+            user = await User.findOne({ email });
+        } else if (rawMobile) {
+            // 🎯 THE FIX: Using the forgiving Regex just like we did in Login!
+            const cleanMobile = String(rawMobile).replace(/\D/g, "");
+            user = await User.findOne({ mobile_number: { $regex: new RegExp(cleanMobile + "$") } });
+        }
+
         if (!user) return res.status(404).json({ status: "false", success: false, message: "No account found." });
 
         const otp = generateOtp();
@@ -234,7 +244,6 @@ exports.forgotPassword = async (req, res) => {
         NotificationHub.dispatchOtp(user.email, user.mobile_number, otp, "Password Reset OTP - Sarvatirthamayi")
             .catch(e => console.error("Background dispatch failed:", e));
 
-        // 🎯 EXACT JSON MATCH FOR forgot_password_model.dart
         return res.status(200).json({
             status: "true", 
             success: true, 

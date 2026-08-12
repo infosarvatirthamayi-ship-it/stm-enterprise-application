@@ -23,12 +23,12 @@ exports.login = async (req, res) => {
         if (isValidEmail(identifier)) {
             query.email = normalizeEmail(identifier);
         } else {
-            // 🎯 Forgiving Regex match for mobile numbers
-            const cleanMobile = String(identifier).replace(/\D/g, "");
-            if (cleanMobile.length < 7) {
+            // 🎯 STRICT LOOKUP: Relying completely on the normalized E.164 standard
+            const cleanMobile = normalizeMobile(identifier);
+            if (!cleanMobile) {
                  return res.status(400).json({ status: "false", success: false, message: "Invalid mobile format." });
             }
-            query.mobile_number = { $regex: new RegExp(cleanMobile + "$") };
+            query.mobile_number = cleanMobile; 
         }
         
         // 🎯 QUERY ISOLATED DATABASE: Only searches Devotees
@@ -68,6 +68,7 @@ exports.signUp = async (req, res) => {
         const { email, password, first_name } = req.body;
         const rawMobile = req.body.mobile_number || req.body.mobileNo || req.body.mobile;
 
+        // 1. Strict Input Validation
         if (!first_name || !email || !rawMobile || !password) {
             return res.status(400).json({ status: "false", success: false, message: "All fields are required." });
         }
@@ -145,6 +146,7 @@ exports.verifyOtp = async (req, res) => {
             return res.status(400).json({ status: "false", success: false, message: "Mobile number and OTP are required." });
         }
 
+        // 🎯 STRICT LOOKUP: Standardized E.164 Format
         const mobile = normalizeMobile(rawMobile);
         const user = await User.findOne({ mobile_number: mobile });
         
@@ -160,7 +162,7 @@ exports.verifyOtp = async (req, res) => {
             isTokenValid = true;
         }
 
-        if (!isTokenValid) return res.status(400).json({ status: "false", success: false, message: "Invalid or expired OTP." });
+        if (!isTokenValid) return res.status(400).json({ status: "false", success: false, message: "Invalid or expired authorization code." });
 
         const type = Number(user.user_type);
         if (type === 1 || type === 2 || user.role === 'admin' || user.role === 'temple_admin') {
@@ -197,6 +199,7 @@ exports.resendOtp = async (req, res) => {
         const rawMobile = req.body.mobile_number || req.body.mobileNo || req.body.mobile;
         if (!rawMobile) return res.status(400).json({ status: "false", success: false, message: "Mobile number is required." });
 
+        // 🎯 STRICT LOOKUP
         const mobileNumber = normalizeMobile(rawMobile);
         const user = await User.findOne({ mobile_number: mobileNumber });
 
@@ -229,9 +232,9 @@ exports.forgotPassword = async (req, res) => {
             const email = normalizeEmail(rawEmail);
             user = await User.findOne({ email });
         } else if (rawMobile) {
-            // 🎯 THE FIX: Using the forgiving Regex just like we did in Login!
-            const cleanMobile = String(rawMobile).replace(/\D/g, "");
-            user = await User.findOne({ mobile_number: { $regex: new RegExp(cleanMobile + "$") } });
+            // 🎯 STRICT LOOKUP: No regex required anymore!
+            const cleanMobile = normalizeMobile(rawMobile);
+            user = await User.findOne({ mobile_number: cleanMobile });
         }
 
         if (!user) return res.status(404).json({ status: "false", success: false, message: "No account found." });
@@ -244,6 +247,7 @@ exports.forgotPassword = async (req, res) => {
         NotificationHub.dispatchOtp(user.email, user.mobile_number, otp, "Password Reset OTP - Sarvatirthamayi")
             .catch(e => console.error("Background dispatch failed:", e));
 
+        // 🎯 EXACT JSON MATCH FOR forgot_password_model.dart
         return res.status(200).json({
             status: "true", 
             success: true, 

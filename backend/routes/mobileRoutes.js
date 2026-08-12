@@ -3,7 +3,7 @@ const router = express.Router();
 
 // --- Controllers ---
 const authMobileController = require('../controllers/mobile/authMobileController'); 
-
+ const countryController = require('../controllers/shared/countryController');
 
 const usersController = require('../controllers/user/usersController');
 
@@ -43,6 +43,8 @@ router.post('/reset-password', authMobileController.resetPassword);
 
 router.post('/logout', protectMobile, authMobileController.logout);
 
+
+router.get('/countries', countryController.getActiveCountries);
 // =========================================================================
 // 🏪 MOBILE CORE FEATURES LAYER (Public)
 // =========================================================================

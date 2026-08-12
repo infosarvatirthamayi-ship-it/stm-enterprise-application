@@ -89,7 +89,15 @@ exports.protectMobile = async (req, res, next) => {
     if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
       token = req.headers.authorization.split(" ")[1];
     }
-    if (!token) return res.status(401).json({ status: "false", success: false, message: "Mobile authorization failed: Bearer token required." });
+    
+    // 1. Missing Token Handling
+    if (!token) {
+      // 🎯 THE FIX: If they are trying to log out without a token, let them succeed locally
+      if (req.originalUrl && req.originalUrl.includes('/logout')) {
+          return res.status(200).json({ status: "true", success: true, message: "Logged out successfully." });
+      }
+      return res.status(401).json({ status: "false", success: false, message: "Mobile authorization failed: Bearer token required." });
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
@@ -101,6 +109,13 @@ exports.protectMobile = async (req, res, next) => {
     req.user = normalizeUserPayload(user, decoded);
     return next();
   } catch (error) {
+    // 2. Expired/Invalid Token Handling
+    // 🎯 THE FIX: If the token is expired but they just want to logout, let them succeed locally
+    if (req.originalUrl && req.originalUrl.includes('/logout')) {
+        return res.status(200).json({ status: "true", success: true, message: "Logged out successfully (Session cleared)." });
+    }
+
+    // Standard strict rejection for all other routes
     let message = error.name === "JsonWebTokenError" ? "Malformed signature. Security validation failed." : "Session expired. Please login again.";
     return res.status(401).json({ status: "false", success: false, message });
   }

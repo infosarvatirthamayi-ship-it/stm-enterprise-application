@@ -27,6 +27,7 @@ const usersController = require('../controllers/user/usersController');
 const aboutController = require('../controllers/user/aboutController');
 const homeController = require('../controllers/user/homeController'); 
 const adminUserController = require('../controllers/userController'); 
+const countryController = require('../controllers/shared/countryController');
 
 // --- Middleware ---
 const { protectWeb } = require('../middleware/authMiddleware');
@@ -69,6 +70,7 @@ router.get('/rituals', webRitualController.getAllWebRituals);
 router.get('/rituals/:ritualId/packages', webRitualController.getRitualPackages);
 router.get('/about-data', aboutController.getWebAboutData);
 
+router.get('/countries', countryController.getActiveCountries);
 
 // =========================================================================
 // 💳 SECURE MEMBERSHIP & CHECKOUT ENGINE (FinTech BFF)

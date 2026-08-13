@@ -5,8 +5,9 @@ const {
     normalizeEmail, 
     normalizeMobile,
     generateOtp,
-    NotificationHub
 } = require("../shared/authService");
+
+const NotificationHub = require("../../utils/NotificationHub");
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).toLowerCase());
 

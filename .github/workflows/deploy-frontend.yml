@@ -1,14 +1,16 @@
 name: Deploy Frontend
+
 on:
   push:
     branches:
       - main
     paths:
-      - 'frontend/**' 
+      - 'frontend/**'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Deploy Frontend to Server
         uses: appleboy/ssh-action@master
@@ -16,11 +18,43 @@ jobs:
           host: ${{ secrets.PROD_SERVER_IP }}
           username: ${{ secrets.PROD_SERVER_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+
           script: |
-            echo "📦 Pulling and Building Frontend..."
+            set -e
+
+            echo "📦 Starting frontend deployment..."
+
             cd /var/www/sarvatirthamayi_site/frontend
-            git fetch --all
+
+            echo "🔄 Fetching latest code..."
+            git fetch origin main
             git reset --hard origin/main
+
+            echo "📦 Installing dependencies..."
             npm install
+
+            echo "🏗️ Building frontend..."
+            rm -rf dist
             npm run build
-            echo "✅ Frontend Deployment Completely Successful! (Backend was left untouched)"
+
+            echo "🔍 Checking generated files..."
+
+            test -f dist/index.html
+            test -d dist/assets
+
+            JS_FILE=$(grep -o 'assets/[^"]*\.js' dist/index.html | head -1)
+            CSS_FILE=$(grep -o 'assets/[^"]*\.css' dist/index.html | head -1)
+
+            echo "JS: $JS_FILE"
+            echo "CSS: $CSS_FILE"
+
+            test -f "dist/$JS_FILE"
+            test -f "dist/$CSS_FILE"
+
+            echo "✅ Frontend build validation successful!"
+
+            echo "🔄 Reloading Nginx..."
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            echo "🚀 Frontend deployment completed successfully!"

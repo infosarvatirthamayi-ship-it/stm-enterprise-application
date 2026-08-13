@@ -1,29 +1,45 @@
 name: Deploy Backend
+
 on:
   push:
     branches:
       - main
     paths:
-      - 'backend/**' 
+      - 'backend/**'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy Backend to Server
+      - name: 🚀 Deploy Backend to Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROD_SERVER_IP }}
           username: ${{ secrets.PROD_SERVER_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+
           script: |
-            echo "⚙️ Pulling and Reloading Backend..."
+            set -e
+
+            echo "⚙️ Starting backend deployment..."
+
             cd /var/www/sarvatirthamayi_site/backend
-            git fetch --all
+
+            echo "🔄 Fetching latest backend code..."
+            git fetch origin main
             git reset --hard origin/main
-            npm install
-            
-            # Zero-downtime reload
-            pm2 reload all
-            
-            echo "✅ Backend Deployment Completely Successful! (Zero downtime)"
+
+            echo "📦 Installing production dependencies..."
+            npm ci --omit=dev
+
+            echo "🔍 Checking PM2 application..."
+            pm2 describe stm-api
+
+            echo "🔄 Reloading STM API..."
+            pm2 reload stm-api --update-env
+
+            echo "📊 PM2 status:"
+            pm2 status
+
+            echo "✅ Backend deployment completed successfully!"

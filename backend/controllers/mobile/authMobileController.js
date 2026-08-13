@@ -297,9 +297,13 @@ exports.forgotVerifyOtp = async (req, res) => {
 
         if (!isTokenValid) return res.status(400).json({ status: "false", success: false, message: "Invalid or expired OTP." });
 
+        // 🎯 THE FIX: Sync the validated OTP into the database. 
+        // This prevents the external provider from burning it, guaranteeing the next step succeeds!
+        user.otp = otp;
+        await user.save();
+
         const tempToken = generateAccessToken(user, 'mobile');
         
-        // 🎯 EXACT JSON MATCH FOR forgot_verify_otp_model.dart
         return res.status(200).json({
             status: "true",
             success: true,
@@ -315,10 +319,10 @@ exports.forgotVerifyOtp = async (req, res) => {
         return res.status(500).json({ status: "false", success: false, message: "Server error" });
     }
 };
-
 exports.resetPassword = async (req, res) => {
     try {
-        const { password, otp } = req.body;
+        const { password } = req.body;
+        const otp = String(req.body.otp || "").trim(); // 🎯 THE FIX: Force String and trim whitespace!
         const confirmPassword = req.body.confirm_password || req.body.confirmPassword;
         const userId = req.body.user_id || req.body.userId;
 
@@ -343,7 +347,6 @@ exports.resetPassword = async (req, res) => {
 
         const token = generateAccessToken(user, 'mobile');
         
-        // 🎯 EXACT JSON MATCH FOR reset_password_model.dart
         return res.status(200).json({
             status: "true",
             success: true,

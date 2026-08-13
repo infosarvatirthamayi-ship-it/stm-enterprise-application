@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy Frontend to Server
+      - name: 🚀 Deploy Frontend to Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROD_SERVER_IP }}
@@ -22,22 +22,26 @@ jobs:
           script: |
             set -e
 
-            echo "📦 Starting frontend deployment..."
+            echo "🚀 Starting frontend deployment..."
 
-            cd /var/www/sarvatirthamayi_site/frontend
+            cd /var/www/sarvatirthamayi_site
 
             echo "🔄 Fetching latest code..."
             git fetch origin main
             git reset --hard origin/main
 
+            cd frontend
+
             echo "📦 Installing dependencies..."
-            npm install
+            npm ci
+
+            echo "🧹 Removing old build..."
+            rm -rf dist
 
             echo "🏗️ Building frontend..."
-            rm -rf dist
             npm run build
 
-            echo "🔍 Checking generated files..."
+            echo "🔍 Validating build..."
 
             test -f dist/index.html
             test -d dist/assets
@@ -45,16 +49,18 @@ jobs:
             JS_FILE=$(grep -o 'assets/[^"]*\.js' dist/index.html | head -1)
             CSS_FILE=$(grep -o 'assets/[^"]*\.css' dist/index.html | head -1)
 
-            echo "JS: $JS_FILE"
-            echo "CSS: $CSS_FILE"
+            echo "Generated JS: $JS_FILE"
+            echo "Generated CSS: $CSS_FILE"
 
             test -f "dist/$JS_FILE"
             test -f "dist/$CSS_FILE"
 
-            echo "✅ Frontend build validation successful!"
+            echo "✅ Build validation successful!"
+
+            echo "🔧 Testing Nginx..."
+            sudo nginx -t
 
             echo "🔄 Reloading Nginx..."
-            sudo nginx -t
             sudo systemctl reload nginx
 
             echo "🚀 Frontend deployment completed successfully!"

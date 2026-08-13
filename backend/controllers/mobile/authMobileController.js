@@ -200,12 +200,21 @@ exports.resendOtp = async (req, res) => {
         const rawMobile = req.body.mobile_number || req.body.mobileNo || req.body.mobile;
         if (!rawMobile) return res.status(400).json({ status: "false", success: false, message: "Mobile number is required." });
 
-        // 🎯 STRICT LOOKUP
         const mobileNumber = normalizeMobile(rawMobile);
         const user = await User.findOne({ mobile_number: mobileNumber });
 
         if (!user) return res.status(404).json({ status: "false", success: false, message: "Account not found." });
         if (user.is_verified) return res.status(400).json({ status: "false", success: false, message: "Account is already verified." });
+
+        // 🎯 THE FIX: OTP Cooldown Check for Resend
+        const cooldownTime = new Date(Date.now() + 9 * 60 * 1000);
+        if (user.otp && user.otp_expires > cooldownTime) {
+            return res.status(429).json({ 
+                status: "false", 
+                success: false, 
+                message: "An OTP was recently sent. Please wait 60 seconds." 
+            });
+        }
 
         const otp = generateOtp();
         user.otp = otp;
@@ -233,12 +242,22 @@ exports.forgotPassword = async (req, res) => {
             const email = normalizeEmail(rawEmail);
             user = await User.findOne({ email });
         } else if (rawMobile) {
-            // 🎯 STRICT LOOKUP: No regex required anymore!
             const cleanMobile = normalizeMobile(rawMobile);
             user = await User.findOne({ mobile_number: cleanMobile });
         }
 
         if (!user) return res.status(404).json({ status: "false", success: false, message: "No account found." });
+
+        // 🎯 THE FIX: OTP Cooldown Check (Prevents overwriting within 60 seconds)
+        // If the OTP has more than 9 minutes left, it was generated less than 1 min ago.
+        const cooldownTime = new Date(Date.now() + 9 * 60 * 1000);
+        if (user.otp && user.otp_expires > cooldownTime) {
+            return res.status(429).json({ 
+                status: "false", 
+                success: false, 
+                message: "An OTP was just sent. Please wait 60 seconds before requesting a new one." 
+            });
+        }
 
         const otp = generateOtp();
         user.otp = otp;
@@ -248,7 +267,6 @@ exports.forgotPassword = async (req, res) => {
         NotificationHub.dispatchOtp(user.email, user.mobile_number, otp, "Password Reset OTP - Sarvatirthamayi")
             .catch(e => console.error("Background dispatch failed:", e));
 
-        // 🎯 EXACT JSON MATCH FOR forgot_password_model.dart
         return res.status(200).json({
             status: "true", 
             success: true, 
@@ -264,7 +282,6 @@ exports.forgotPassword = async (req, res) => {
         return res.status(500).json({ status: "false", success: false, message: "Server recovery pipeline error" });
     }
 };
-
 exports.forgotVerifyOtp = async (req, res) => {
     try {
         const userId = req.body.user_id || req.body.userId;

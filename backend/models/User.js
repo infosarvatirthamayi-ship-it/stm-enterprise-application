@@ -35,27 +35,41 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
 
-userSchema.pre('save', async function(next) {
-    // Prevent empty string duplicate key errors
-    if (this.email === "") this.email = undefined;
+// 🎯 THE FIX: Standard function wrapper + Async IIFE to escape the next() trap
+userSchema.pre('save', function(next) {
+    const user = this;
 
-    // Generate legacy SQL ID
-    if (!this.sql_id || this.sql_id === 0) {
-        this.sql_id = Math.floor(100000 + Math.random() * 900000);
-    }
+    (async () => {
+        try {
+            // Prevent empty string duplicate key errors
+            if (user.email === "") user.email = undefined;
 
-    if (this.isModified('first_name') || this.isModified('last_name')) {
-        this.name = `${this.first_name} ${this.last_name || ''}`.trim();
-    }
+            // Generate legacy SQL ID
+            if (!user.sql_id || user.sql_id === 0) {
+                user.sql_id = Math.floor(100000 + Math.random() * 900000);
+            }
 
-    if (this.isModified('password')) {
-        const isAlreadyHashed = this.password.startsWith('$2b$') || this.password.startsWith('$2a$');
-        if (!isAlreadyHashed) {
-            const salt = await bcrypt.genSalt(12);
-            this.password = await bcrypt.hash(this.password, salt);
+            // Sync the full name
+            if (user.isModified('first_name') || user.isModified('last_name')) {
+                user.name = `${user.first_name} ${user.last_name || ''}`.trim();
+            }
+
+            // Secure the password
+            if (user.isModified('password')) {
+                const isAlreadyHashed = user.password.startsWith('$2b$') || user.password.startsWith('$2a$');
+                if (!isAlreadyHashed) {
+                    const salt = await bcrypt.genSalt(12);
+                    user.password = await bcrypt.hash(user.password, salt);
+                }
+            }
+            
+            // ✅ Executes safely for both Signup and Profile Updates
+            next();
+        } catch (error) {
+            // ✅ Passes validation/hashing errors correctly to the controller
+            next(error);
         }
-    }
-    next();
+    })();
 });
 
 module.exports = mongoose.models.User || mongoose.model('User', userSchema, 'users');

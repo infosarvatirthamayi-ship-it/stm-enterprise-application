@@ -25,6 +25,8 @@ const favoriteController = require('../controllers/mobile/favoriteController');
 
 const mobileEventController = require('../controllers/mobile/mobileEventController');
 
+const offerController = require('../controllers/user/offerController');
+
 // --- Middleware ---
 const { protectMobile } = require('../middleware/authMiddleware');
 
@@ -54,6 +56,13 @@ router.get('/temples', mobileTempleController.getMobileTemples);
 router.get('/temple/index', mobileTempleController.getMobileTemples);
 router.post('/temples/details', mobileTempleController.getMobileTempleById); 
 router.post('/temple/show', mobileTempleController.getMobileTempleById);
+
+// ✨ ADD THESE NEW OFFER ROUTES HERE ✨
+router.get('/offer/index', protectMobile, offerController.getOffers);
+router.post('/offer/index', protectMobile, offerController.getOffers);
+router.get('/offer/show', protectMobile, offerController.getOfferById);
+router.post('/offer/show', protectMobile, offerController.getOfferById);
+
 
 // Mobile Temple Booking Routes
 router.post('/temple/booking', protectMobile, mobileTempleBookingController.initiateTempleBooking);
